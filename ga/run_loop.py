@@ -8,9 +8,10 @@ def run_loop(agent, env, model_config, max_frames=0, max_episodes=0):
     total_frames = 0
     total_episodes = 0
     start_time = time.time()
-
+    sigma = 0.5
+    start_seed = 1
     # TODO: handle seeds
-    agent.setup_model(model_config)
+    agent.setup_model(model_config, sigma, start_seed)
     try:
         while not max_episodes or total_episodes < max_episodes:
             total_episodes += 1

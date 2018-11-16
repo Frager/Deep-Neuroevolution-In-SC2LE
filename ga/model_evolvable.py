@@ -7,16 +7,20 @@ from common.enums import ModelDataFormat as DataFormat
 class ModelEvolvable:
 
     def __init__(self, scope):
+        # start_seed = (sigma, seed)
         self.start_seed = []
-        # evolve_seeds = [[sigma, seed], ...]
+        # evolve_seeds = [(sigma, seed), ...]
         self.evolve_seeds = []
         self.add_tensors = {}
         self.variables_collection = []
         self.scope = scope
 
-    def spacial_block(self, spacial_dims, channel_dims, data_format):
+        self.data_format = None
+
+    def spacial_block(self, spacial_dims, channel_dims):
+        # TODO: do I actually need batch dimension?
         block_input = tf.placeholder(tf.float32, [None, len(channel_dims), spacial_dims[0], spacial_dims[1]])
-        if data_format == DataFormat.NHWC:
+        if self.data_format == DataFormat.NHWC:
             channel_axis = 3
             block = tf.transpose(block_input, [0, 2, 3, 1])  # NHWC -> NCHW
             block = tf.split(block, len(channel_dims), axis=channel_axis)
@@ -28,20 +32,20 @@ class ModelEvolvable:
                 # TODO: check if convolution of one_hot encoded spacial input is correct
                 block[i] = tf.one_hot(tf.to_int32(tf.squeeze(block[i], axis=channel_axis)), d, axis=channel_axis)
                 block[i] = layers.conv2d(block[i], num_outputs=max(1, round(np.log2(d))), kernel_size=1
-                                         , data_format=data_format.value, variables_collections=[self.scope])
+                                         , data_format=self.data_format.value, variables_collections=[self.scope])
             else:
                 block[i] = tf.log(block[i] + 1.0)
         block = tf.concat(block, axis=channel_axis)
 
-        conv1 = layers.conv2d(block, num_outputs=16, kernel_size=5, data_format=data_format.value,
+        conv1 = layers.conv2d(block, num_outputs=16, kernel_size=5, data_format=self.data_format.value,
                               variables_collections=[self.scope])
-        conv2 = layers.conv2d(conv1, num_outputs=32, kernel_size=3, data_format=data_format.value,
+        conv2 = layers.conv2d(conv1, num_outputs=32, kernel_size=3, data_format=self.data_format.value,
                               variables_collections=[self.scope])
-        return conv2, block_input   # block_input always is in NHWC format
+        return conv2, block_input
 
-    def non_spacial_block(self, dim, spacial_size, data_format):
+    def non_spacial_block(self, dim, spacial_size):
         block_input = tf.placeholder(tf.float32, [None, dim])
-        broadcast_block = self.broadcast_flat_feature(block_input, spacial_size, data_format)
+        broadcast_block = self.broadcast_flat_feature(block_input, spacial_size, self.data_format)
         return broadcast_block, block_input
 
     def broadcast_flat_feature(self, block_input, spacial_size, data_format):
@@ -53,11 +57,11 @@ class ModelEvolvable:
 
     def fully_conv(self, model_config):
         spacial_size = model_config.size
-        data_format = model_config.model_format
+        self.data_format = model_config.model_format
         feature_inputs = model_config.feature_inputs
         arg_outputs = model_config.arg_outputs
         num_functions = model_config.num_functions
-        if not isinstance(data_format, DataFormat):
+        if not isinstance(self.data_format, DataFormat):
             raise ValueError('variable data_format is not of type ModelDataFormat')
         block_inputs = []
         blocks = []
@@ -65,17 +69,15 @@ class ModelEvolvable:
             with tf.variable_scope(feature_input.get_feature_names_as_scope()):
                 if feature_input.is_spacial:
                     block, spacial_input = self.spacial_block(feature_input.get_spacial_dimensions(),
-                                                              feature_input.get_channel_dimensions(),
-                                                              data_format)
+                                                              feature_input.get_channel_dimensions())
                     block_inputs.append(spacial_input)
                     blocks.append(block)
                 else:
                     block, non_spacial_input = self.non_spacial_block(np.sum(feature_input.get_channel_dimensions()),
-                                                                      spacial_size,
-                                                                      data_format)
+                                                                      spacial_size)
                     block_inputs.append(non_spacial_input)
                     blocks.append(block)
-        if data_format == DataFormat.NCHW:
+        if self.data_format == DataFormat.NCHW:
             state = tf.concat(blocks, axis=1)
         else:
             state = tf.concat(blocks, axis=3)
@@ -93,17 +95,16 @@ class ModelEvolvable:
             value = tf.reshape(value, [-1])
 
         with tf.variable_scope("fn_out"):
-            # fully_connected to non-spacial action (action)
+            # fully_connected to action id
             fn_out = self.non_spatial_output(fully_connected, num_functions)
             # TODO: use mask on fn_out with available actions
 
         with tf.variable_scope("args_out"):
-            # state to spatial action policy (action arguments for each action type)
-            # TODO: convert args_out to dict with keys = arg_type from actions.TYPES
+            # state to non-spacial/spatial action arguments (for each action type)
             args_out = {}
             for arg_output in arg_outputs:
                 if arg_output.is_spacial:
-                    arg_out = self.spatial_output(state, data_format)
+                    arg_out = self.spatial_output(state)
                 else:
                     arg_out = self.non_spatial_output(fully_connected, arg_output.arg_size)
                 args_out[arg_output.arg_type] = arg_out
@@ -126,10 +127,10 @@ class ModelEvolvable:
         return tf.nn.softmax(logits)
 
     # from https://github.com/simonmeister/pysc2-rl-agents/blob/master/rl/networks/fully_conv.py#L80-L84
-    def spatial_output(self, x, data_format):
+    def spatial_output(self, x):
         logits = layers.conv2d(x, num_outputs=1, kernel_size=1, stride=1, activation_fn=None,
-                               data_format=data_format.value, variables_collections=[self.scope])
-        if data_format == DataFormat.NHWC:
+                               data_format=self.data_format.value, variables_collections=[self.scope])
+        if self.data_format == DataFormat.NHWC:
             # return output back to NCHW format
             logits = layers.flatten(tf.transpose(logits, [0, 3, 1, 2]))
         else:
@@ -137,15 +138,29 @@ class ModelEvolvable:
         # TODO: tf.math.argmax(input, axis) Returns the index with the largest value across axes of a tensor
         return tf.nn.softmax(logits)
 
-    def evolve(self, sigma, seed):
+    def initialize_with_seed(self, sigma, seed):
+        self.start_seed = (sigma, seed)
+        self.evolve_seeds = []
         tf.random.set_random_seed(seed)
+        tf_ops = []
+        for variable in self.variables_collection:
+            # Fills tensor with elements samples from the normal distribution
+            tf_ops.append(tf.assign(variable, tf.random_normal(variable.shape, mean=0, stddev=sigma, dtype=tf.float32)))
+            # tf_ops.append(tf.assign(variable, tf.zeros(variable.shape, dtype=tf.float32)))
+        return tf_ops
+
+    def evolve(self, sigma, seed):
         self.evolve_seeds.append((sigma, seed))
+        # TODO: do i need random object for parallel evolution?
+        tf.random.set_random_seed(seed)
+        tf_ops = []
         for variable in self.variables_collection:
             # use pre initialized tensors to not constantly initialize new tensors for evolution
             to_add = self.add_tensors[variable.shape.num_elements()]
             # Fills tensor with elements samples from the normal distribution
-            tf.assign(to_add, tf.random_normal(to_add.shape, mean=0, stddev=sigma, dtype=tf.float32))
-            variable.assign_add(tf.reshape(to_add, variable.shape))
+            random = tf.assign(to_add, tf.random_normal(to_add.shape, mean=0, stddev=sigma, dtype=tf.float32))
+            tf_ops.append(tf.assign_add(variable, tf.reshape(random, variable.shape)))
+        return tf_ops
 
     def compress(self):
         return CompressedModel(self.start_seed, self.evolve_seeds)

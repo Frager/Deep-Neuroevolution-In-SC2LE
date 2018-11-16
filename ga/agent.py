@@ -19,20 +19,23 @@ class TestAgent:
     def init(self):
         self.session.run(self.variables_initializer())
 
-    def setup_model(self, model_config):
-        self.model = Model(scope=model_config.scope)
+    def setup_model(self, model_config, sigma, start_seed):
+        self.model = Model(scope=model_config.scope, )
         self.block_inputs, self.policy, self.value = self.model.fully_conv(model_config)
         self.init()
+        self.reset_model(sigma, start_seed)
         self.model_config = model_config
         self.feature_names_lists = [feature.feature_names_list for feature in model_config.feature_inputs]
+        # for variable in self.model.variables_collection:
+        #     print(variable.eval())
         return
 
-    def reset_model(self, start_seed):
-        # TODO: reset Model with start seed
+    def reset_model(self, sigma, start_seed):
+        self.session.run(self.model.initialize_with_seed(sigma, start_seed))
         return
 
-    def evolve_model(self, evolve_seed):
-        # TODO: evolve model with seed
+    def evolve_model(self, sigma, evolve_seed):
+        self.session.run(self.model.evolve(sigma, evolve_seed))
         return
 
     def compress_model(self):
@@ -51,12 +54,6 @@ class TestAgent:
             feed_dict=feed_dict
         )
         action_id, action_args = sample_actions(p_action_id, p_action_args, available_actions)
-        #TODO:
-        # ValueError: Wrong number of values
-        # for argument of 4 / select_control_group (4 / control_group_act[5]; 5 / control_group_id[10]),
-        # got: [ array([0.2119934, 0.18735965, 0.14499538, 0.30552408, 0.15012754], dtype=float32),
-        # array([0.09692005, 0.10003376, 0.07594538, 0.1871254, 0.10363444,
-        #        0.09784229, 0.07564336, 0.07490392, 0.10570957, 0.08224183], dtype=float32)]
 
         return [action_id, action_args], value_estimate
 
