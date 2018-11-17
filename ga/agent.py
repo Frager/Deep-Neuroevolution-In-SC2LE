@@ -20,7 +20,7 @@ class TestAgent:
         self.session.run(self.variables_initializer())
 
     def setup_model(self, model_config, sigma, start_seed):
-        self.model = Model(scope=model_config.scope, )
+        self.model = Model(scope=model_config.scope)
         self.block_inputs, self.policy, self.value = self.model.fully_conv(model_config)
         self.init()
         self.reset_model(sigma, start_seed)
@@ -59,8 +59,9 @@ class TestAgent:
 
     def input_to_feed_dict(self, obs):
         feed_dict = {}
-        for i, o in enumerate(obs):
-            feed_dict[self.block_inputs[i].name] = o
+        for input_name, value in obs.items():
+            # TODO: [value] is only a temporary solution for batched observations (which I don't think I need)
+            feed_dict[self.block_inputs[input_name]] = [value]
         return feed_dict
 
 

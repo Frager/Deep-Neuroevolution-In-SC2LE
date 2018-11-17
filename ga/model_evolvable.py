@@ -63,19 +63,20 @@ class ModelEvolvable:
         num_functions = model_config.num_functions
         if not isinstance(self.data_format, DataFormat):
             raise ValueError('variable data_format is not of type ModelDataFormat')
-        block_inputs = []
+        block_inputs = {}
         blocks = []
         for feature_input in feature_inputs:
             with tf.variable_scope(feature_input.get_feature_names_as_scope()):
                 if feature_input.is_spacial:
                     block, spacial_input = self.spacial_block(feature_input.get_spacial_dimensions(),
                                                               feature_input.get_channel_dimensions())
-                    block_inputs.append(spacial_input)
+                    block_inputs[feature_input.input_name] = spacial_input
                     blocks.append(block)
                 else:
+                    # TODO: what about features of variable dimensions? like multi_select, alerts, build_queue ...
                     block, non_spacial_input = self.non_spacial_block(np.sum(feature_input.get_channel_dimensions()),
                                                                       spacial_size)
-                    block_inputs.append(non_spacial_input)
+                    block_inputs[feature_input.input_name] = non_spacial_input
                     blocks.append(block)
         if self.data_format == DataFormat.NCHW:
             state = tf.concat(blocks, axis=1)

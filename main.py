@@ -73,12 +73,12 @@ if __name__ == '__main__':
     players.append(sc2_env.Agent(sc2_env.Race[FLAGS.agent_race]))
 
     # TODO: mapping from Player -> player, ScoreCumulative -> score_cumulative, Minimap -> feature_minimap
-    flat_feature_names = ['player']
-    flat_feature_input = ModelInput(flat_feature_names, feature_dims.get_flat_feature_dims(flat_feature_names))
+    flat_feature_names = ['player', 'score_cumulative']
+    flat_feature_input = ModelInput('flat', flat_feature_names, feature_dims.get_flat_feature_dims(flat_feature_names))
     size = FLAGS.feature_minimap_size
-    minimap_input = ModelInput(['feature_minimap'], feature_dims.get_minimap_dims(), size)
+    minimap_input = ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), size)
     size = FLAGS.feature_screen_size
-    screen_input = ModelInput(['feature_screen'], feature_dims.get_screen_dims(), size)
+    screen_input = ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), size)
     feature_inputs = [minimap_input, screen_input, flat_feature_input]
 
     arg_outputs = []

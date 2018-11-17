@@ -8,20 +8,24 @@ class Preprocessor:
         self.model_config = model_config
 
     def preprocess_observations(self, obs):
-        return [self.preprocess_observation(obs, feature_input) for feature_input in self.model_config.feature_inputs]
+        observations = {}
+        for feature_input in self.model_config.feature_inputs:
+            observations[feature_input.input_name] = self.preprocess_observation(obs, feature_input)
+        return observations
 
     def preprocess_observation(self, obs, feat_input):
         processed_observations = []
         for o in obs:
             # if feature_input.is_spacial:
-            processed_observations.append(o[feat_input.feature_names_list[0]])
+            for feature in feat_input.feature_names_list:
+                processed_observations.append(o[feature])
             # TODO: test is this works now
             # else:
             #     concatenated_features = itertools.chain([obs[feature_name]
             #                                              for feature_name in feature_input.feature_names_list])
             #     processed_observations.append(concatenated_features)
 
-        return processed_observations
+        return np.concatenate(processed_observations)
 
     def preprocess_available_actions(self, available_actions_raw):
         available_actions = np.zeros(self.model_config.num_functions, dtype=np.float32)

@@ -1,6 +1,5 @@
 # A run loop for agent/environment interactions
 import time
-import tensorflow as tf
 
 
 # from deepmind/blizzard sc2le

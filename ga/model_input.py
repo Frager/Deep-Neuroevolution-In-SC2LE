@@ -1,6 +1,7 @@
 
 class ModelInput:
-    def __init__(self, feature_names_list, channel_dims, spacial_dims=None):
+    def __init__(self, input_name, feature_names_list, channel_dims, spacial_dims=None):
+        self.input_name = input_name
         self.feature_names_list = feature_names_list
         self.channel_dims = channel_dims
         self.spacial_dims = spacial_dims
