@@ -1,6 +1,7 @@
 
 import tensorflow as tf
 import numpy as np
+from ga.model_evolvable import CompressedModel
 from ga.model_evolvable import ModelEvolvable as Model
 
 
@@ -8,42 +9,49 @@ class TestAgent:
     def __init__(self, session, model_config, variables_initializer):
         self.session = session
         self.model = None
-        self.block_inputs = self.policy = self.value = None
+        self.block_inputs = self.policy = self.value = self.mutate_inputs = None
         self.model_config = model_config
-        self.feature_names_lists = [feature.feature_names_list for feature in model_config.feature_inputs]
         self.variables_initializer = variables_initializer
         self.available_actions_tensor = tf.placeholder(dtype=tf.float32,
                                                        shape=[None, model_config.num_functions],
                                                        name='input_available_actions')
 
-    def init(self):
+    def init_variables(self):
         self.session.run(self.variables_initializer())
 
-    def setup_model(self, model_config, sigma, start_seed):
-        self.model = Model(scope=model_config.scope)
-        self.block_inputs, self.policy, self.value = self.model.fully_conv(model_config)
-        self.init()
-        self.reset_model(sigma, start_seed)
-        self.model_config = model_config
-        self.feature_names_lists = [feature.feature_names_list for feature in model_config.feature_inputs]
+    def setup_model(self, start_seed, evolve_seeds=[]):
+        self.model = Model(scope=self.model_config.scope)
+        self.block_inputs, self.policy, self.value, self.mutate_inputs = self.model.fully_conv(self.model_config)
+        self.init_variables()
+
+        self.model_assign_all(start_seed)
+        for seed in evolve_seeds:
+            self.model_assign_all(seed, do_assign_add=True)
+
         # for variable in self.model.variables_collection:
         #     print(variable.eval())
         return
 
-    def reset_model(self, sigma, start_seed):
-        self.session.run(self.model.initialize_with_seed(sigma, start_seed))
-        return
-
-    def evolve_model(self, sigma, evolve_seed):
-        self.session.run(self.model.evolve(sigma, evolve_seed))
-        return
+    def model_assign_all(self, start_seed, do_assign_add=False):
+        sigma = start_seed[0]
+        seed = start_seed[1]
+        feed_dict = {}
+        np.random.seed(seed)
+        for mutate_input in self.mutate_inputs:
+            feed_dict[mutate_input] = np.random.normal(0, sigma, mutate_input.shape)
+        if do_assign_add:
+            self.session.run(self.model.assign_add_tensors(), feed_dict=feed_dict)
+        else:
+            self.session.run(self.model.assign_tensors(), feed_dict=feed_dict)
+        print(self.model.variables_collection[0].eval())
 
     def compress_model(self):
-        # TODO: compress model and return compressed model
-        return
+        return self.model.compress()
 
     def decompress_model(self, compressed_model):
-        # TODO: decompress compressed_model and save it in self.model
+        start_seed = compressed_model.start_seed
+        evolve_seeds = compressed_model.evolve_seeds
+        self.setup_model(start_seed, evolve_seeds=evolve_seeds)
         return
 
     def step(self, obs, available_actions):
@@ -53,6 +61,7 @@ class TestAgent:
             [self.policy[0], self.policy[1], self.value, self.available_actions_tensor],
             feed_dict=feed_dict
         )
+        print(p_action_id)
         action_id, action_args = sample_actions(p_action_id, p_action_args, available_actions)
 
         return [action_id, action_args], value_estimate

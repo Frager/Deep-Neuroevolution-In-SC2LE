@@ -1,6 +1,5 @@
 import sys
 import common.env as env
-import ga.agent as test_agent
 import ga.run_loop as runner
 from absl import flags
 from pysc2.env import sc2_env
@@ -19,9 +18,9 @@ import importlib
 if __name__ == '__main__':
     FLAGS = flags.FLAGS
     flags.DEFINE_bool("render", True, "Whether to render with pygame.")
-    point_flag.DEFINE_point("feature_screen_size", "64",
+    point_flag.DEFINE_point("feature_screen_size", "32",
                             "Resolution for screen feature layers.")
-    point_flag.DEFINE_point("feature_minimap_size", "64",
+    point_flag.DEFINE_point("feature_minimap_size", "32",
                             "Resolution for minimap feature layers.")
     point_flag.DEFINE_point("rgb_screen_size", None,
                             "Resolution for rendered screen.")
@@ -72,7 +71,6 @@ if __name__ == '__main__':
     # so the environment knows how to set up the game
     players.append(sc2_env.Agent(sc2_env.Race[FLAGS.agent_race]))
 
-    # TODO: mapping from Player -> player, ScoreCumulative -> score_cumulative, Minimap -> feature_minimap
     flat_feature_names = ['player', 'score_cumulative']
     flat_feature_input = ModelInput('flat', flat_feature_names, feature_dims.get_flat_feature_dims(flat_feature_names))
     size = FLAGS.feature_minimap_size
@@ -89,8 +87,7 @@ if __name__ == '__main__':
 
     model_config = ModelConfig(feature_inputs, arg_outputs, size, NUM_FUNCTIONS, DataFormat.NHWC, scope)
 
-    # setup env
-
+    # TODO: this code block probably goes in Worker class
     sc2_env = env.make_env(map_name=FLAGS.map,
                            players=players,
                            agent_interface_format=sc2_env.parse_agent_interface_format(
@@ -100,17 +97,9 @@ if __name__ == '__main__':
                                rgb_minimap=FLAGS.rgb_minimap_size,
                                action_space=FLAGS.action_space,
                                use_feature_units=FLAGS.use_feature_units))
-
     env = EnvWrapper(sc2_env, model_config)
-
     with tf.Session() as sess:
         agent = agent_cls(sess, model_config, tf.global_variables_initializer)
         # start Runner(envs, workers)
         runner.run_loop(agent, env, model_config)
 
-    # print(block_inputs)
-    # print(policy[0])    # function
-    # print(policy[1])    # action argument per action type
-    # print(value)
-    # for variable in model.variables_collection:
-    #   print(variable)

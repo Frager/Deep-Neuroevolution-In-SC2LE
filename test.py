@@ -1,20 +1,19 @@
-from pysc2.lib.actions import FUNCTIONS, FUNCTION_TYPES, TYPES, FunctionCall
 
+import tensorflow as tf
+import numpy as np
 
-def to_sc2_action(action_id, action_args):
+x = tf.Variable(dtype=tf.float32, expected_shape=[3], initial_value=tf.zeros([3], dtype=tf.float32))
+add = tf.placeholder(dtype=tf.float32, shape=x.shape)
+ops = x.assign(add)
 
-    function = FUNCTIONS[action_id]
-    print(function)
-    type = function.function_type
-    print(type)
-    function_args = []
-    function_types = FUNCTION_TYPES[type]
-    print(function_types)
-    for type in function_types:
-        function_args.append(action_args[TYPES.index(type)])
-    return FunctionCall(function, function_args)
+# ops = x.assign(np.random.normal(loc=0, scale=0.5, size=[3]))
 
+with tf.Session() as sess:
+    sess.run(tf.global_variables_initializer())
+    for i in range(10):
+        feed_dict = dict()
+        np.random.seed(i)
+        feed_dict[add] = np.random.normal(0, 0.5, add.shape)
+        sess.run(ops, feed_dict)
+        print(x.eval())
 
-args = ['screen', 'minimap', 'screen2', 'queued', 'control_group_act', 'control_group_id', 'select_point_act', 'select_add', 'screen', 'screen', 'screen', 'screen']
-
-print(to_sc2_action(3, args))

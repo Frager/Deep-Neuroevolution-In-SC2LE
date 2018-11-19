@@ -7,15 +7,19 @@ from common.enums import ModelDataFormat as DataFormat
 class ModelEvolvable:
 
     def __init__(self, scope):
-        # start_seed = (sigma, seed)
-        self.start_seed = []
-        # evolve_seeds = [(sigma, seed), ...]
+        # seeds : (sigma, seed)
+        self.start_seed = None
         self.evolve_seeds = []
-        self.add_tensors = {}
-        self.variables_collection = []
         self.scope = scope
 
+        self.add_tensors = {}
+        self.variables_collection = []
+        self.weights_collection = []
         self.data_format = None
+
+        self.mutate_input = []
+        self.assign_op = None
+        self.add_op = None
 
     def spacial_block(self, spacial_dims, channel_dims):
         # TODO: do I actually need batch dimension?
@@ -29,14 +33,15 @@ class ModelEvolvable:
             block = tf.split(block_input, len(channel_dims), axis=channel_axis)
         for i, d in enumerate(channel_dims):
             if d > 1:
-                # TODO: check if convolution of one_hot encoded spacial input is correct
                 block[i] = tf.one_hot(tf.to_int32(tf.squeeze(block[i], axis=channel_axis)), d, axis=channel_axis)
+                # TODO: check if convolution of one_hot encoded spacial input is correct
                 block[i] = layers.conv2d(block[i], num_outputs=max(1, round(np.log2(d))), kernel_size=1
                                          , data_format=self.data_format.value, variables_collections=[self.scope])
             else:
                 block[i] = tf.log(block[i] + 1.0)
         block = tf.concat(block, axis=channel_axis)
 
+        # TODO: should I set reuse=True (for all variables in this scope)
         conv1 = layers.conv2d(block, num_outputs=16, kernel_size=5, data_format=self.data_format.value,
                               variables_collections=[self.scope])
         conv2 = layers.conv2d(conv1, num_outputs=32, kernel_size=3, data_format=self.data_format.value,
@@ -98,7 +103,7 @@ class ModelEvolvable:
         with tf.variable_scope("fn_out"):
             # fully_connected to action id
             fn_out = self.non_spatial_output(fully_connected, num_functions)
-            # TODO: use mask on fn_out with available actions
+            # TODO: use mask on fn_out with available actions here? (faster?)
 
         with tf.variable_scope("args_out"):
             # state to non-spacial/spatial action arguments (for each action type)
@@ -112,14 +117,22 @@ class ModelEvolvable:
 
         policy = (fn_out, args_out)
         self.variables_collection = tf.get_collection(self.scope)
-        for tensor in self.variables_collection:
-            if tensor.shape.num_elements() not in self.add_tensors:
-                self.add_tensors[tensor.shape.num_elements()] = tf.Variable(dtype=tf.float32,
-                                                                            expected_shape=[tf.size(tensor)],
-                                                                            initial_value=tf.zeros(
-                                                                                [tf.size(tensor)],
-                                                                                dtype=tf.float32,))
-        return block_inputs, policy, value
+
+        # TODO: this probably belongs in another class
+        assign_ops = []
+        add_ops = []
+        for variable in self.variables_collection:
+            if 'weights' in variable.name:
+                self.weights_collection.append(variable)
+                placeholder = tf.placeholder(dtype=tf.float32, shape=variable.shape)
+                self.mutate_input.append(placeholder)
+                assign_ops.append(variable.assign(placeholder))
+                add_ops.append(variable.assign_add(placeholder))
+                tf.add_to_collection('mutate_input', placeholder)
+        self.assign_op = tf.group(*assign_ops)
+        self.add_op = tf.group(*add_ops)
+
+        return block_inputs, policy, value, self.mutate_input
 
     # from https://github.com/simonmeister/pysc2-rl-agents/blob/master/rl/networks/fully_conv.py#L76-L78
     def non_spatial_output(self, x, channels):
@@ -139,50 +152,29 @@ class ModelEvolvable:
         # TODO: tf.math.argmax(input, axis) Returns the index with the largest value across axes of a tensor
         return tf.nn.softmax(logits)
 
-    def initialize_with_seed(self, sigma, seed):
-        self.start_seed = (sigma, seed)
-        self.evolve_seeds = []
-        tf.random.set_random_seed(seed)
-        tf_ops = []
-        for variable in self.variables_collection:
-            # Fills tensor with elements samples from the normal distribution
-            tf_ops.append(tf.assign(variable, tf.random_normal(variable.shape, mean=0, stddev=sigma, dtype=tf.float32)))
-            # tf_ops.append(tf.assign(variable, tf.zeros(variable.shape, dtype=tf.float32)))
-        return tf_ops
+    def assign_tensors(self):
+        return self.assign_op
 
-    def evolve(self, sigma, seed):
-        self.evolve_seeds.append((sigma, seed))
-        # TODO: do i need random object for parallel evolution?
-        tf.random.set_random_seed(seed)
-        tf_ops = []
-        for variable in self.variables_collection:
-            # use pre initialized tensors to not constantly initialize new tensors for evolution
-            to_add = self.add_tensors[variable.shape.num_elements()]
-            # Fills tensor with elements samples from the normal distribution
-            random = tf.assign(to_add, tf.random_normal(to_add.shape, mean=0, stddev=sigma, dtype=tf.float32))
-            tf_ops.append(tf.assign_add(variable, tf.reshape(random, variable.shape)))
-        return tf_ops
+    def assign_add_tensors(self):
+        return self.add_op
 
     def compress(self):
         return CompressedModel(self.start_seed, self.evolve_seeds)
 
 
-def uncompress_model(model):
-    start_rng, other_rng = model.start_rng, model.other_rng
-    m = ModelEvolvable(start_rng)
-    for sigma, rng in other_rng:
-        m.evolve(sigma, rng)
-    return m
-
-
 def random_seed():
-    return random_seed
+    # TODO: create random seed (independent from tf)
+    sigma = 0.5
+    seed = 123
+    return sigma, seed
 
 
 class CompressedModel:
-    def __init__(self, start_rng=None, other_rng=None):
-        self.start_rng = start_rng if start_rng is not None else random_seed()
-        self.other_rng = other_rng if other_rng is not None else []
+    def __init__(self, start_seed=None, evolve_seeds=None, scope='unnamed_model'):
+        self.start_seed = start_seed if start_seed is not None else random_seed()
+        self.evolve_seeds = evolve_seeds if evolve_seeds is not None else []
+        self.scope = scope
 
     def evolve(self, sigma, rng_state=None):
-        self.other_rng.append((sigma, rng_state if rng_state is not None else random_seed()))
+        self.evolve_seeds.append((sigma, rng_state if rng_state is not None else random_seed()))
+

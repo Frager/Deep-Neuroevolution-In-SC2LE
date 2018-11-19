@@ -12,7 +12,6 @@ class EnvWrapper:
         return self.preprocess_timesteps(timesteps)
 
     def step(self, action):
-        # TODO: wrap actions
         processed_actions = self.process_action(action)
         print(processed_actions)
         timesteps = self.env.step(processed_actions)
