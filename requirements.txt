@@ -2,5 +2,4 @@ numpy==1.15.2
 absl_py==0.5.0
 PySC2==2.0.1
 tensorflow_gpu==1.12.0
-absl==0.0
 tensorflow==1.12.0
