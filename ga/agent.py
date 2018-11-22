@@ -1,7 +1,5 @@
 
-import tensorflow as tf
 import numpy as np
-from ga.model_evolvable import CompressedModel
 from ga.model_evolvable import ModelEvolvable as Model
 
 
@@ -12,21 +10,21 @@ class TestAgent:
         self.block_inputs = self.policy = self.value = self.mutate_inputs = None
         self.model_config = model_config
         self.variables_initializer = variables_initializer
-        self.available_actions_tensor = tf.placeholder(dtype=tf.float32,
-                                                       shape=[None, model_config.num_functions],
-                                                       name='input_available_actions')
+        self.available_actions_input = None
 
     def init_variables(self):
         self.session.run(self.variables_initializer())
 
     def setup_model(self, start_seed, evolve_seeds=[]):
         self.model = Model(scope=self.model_config.scope)
-        self.block_inputs, self.policy, self.value, self.mutate_inputs = self.model.fully_conv(self.model_config)
+        self.block_inputs, self.policy, self.value, self.mutate_inputs, self.available_actions_input = self.model.fully_conv(self.model_config)
         self.init_variables()
 
-        self.model_assign_all(start_seed)
-        for seed in evolve_seeds:
-            self.model_assign_all(seed, do_assign_add=True)
+
+        # TODO: use this:
+        # self.model_assign_all(start_seed)
+        # for seed in evolve_seeds:
+        #     self.model_assign_all(seed, do_assign_add=True)
 
         # for variable in self.model.variables_collection:
         #     print(variable.eval())
@@ -56,14 +54,11 @@ class TestAgent:
 
     def step(self, obs, available_actions):
         feed_dict = self.input_to_feed_dict(obs)
-        feed_dict[self.available_actions_tensor] = available_actions
-        p_action_id, p_action_args, value_estimate, available_actions = self.session.run(
-            [self.policy[0], self.policy[1], self.value, self.available_actions_tensor],
+        feed_dict[self.available_actions_input] = available_actions
+        action_id, action_args, value_estimate = self.session.run(
+            [self.policy[0], self.policy[1], self.value],
             feed_dict=feed_dict
         )
-        print(p_action_id)
-        action_id, action_args = sample_actions(p_action_id, p_action_args, available_actions)
-
         return [action_id, action_args], value_estimate
 
     def input_to_feed_dict(self, obs):
@@ -73,21 +68,3 @@ class TestAgent:
             feed_dict[self.block_inputs[input_name]] = [value]
         return feed_dict
 
-
-def arg_max(id_probabilities):
-    return np.argmax(id_probabilities, 1)
-
-
-def mask_unavailable_actions(available_actions, fn_pi):
-    fn_pi *= available_actions
-    return fn_pi
-
-
-def sample_actions(p_action_id, p_action_args, available_actions):
-    masked_ids = mask_unavailable_actions(available_actions, p_action_id)
-    action_id = arg_max(masked_ids)
-    action_args = dict()
-    for arg_type, arg_pi in p_action_args.items():
-        action_args[arg_type] = arg_max(arg_pi)
-
-    return action_id, action_args

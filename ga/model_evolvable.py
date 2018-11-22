@@ -102,7 +102,7 @@ class ModelEvolvable:
 
         with tf.variable_scope("fn_out"):
             # fully_connected to action id
-            fn_out = self.non_spatial_output(fully_connected, num_functions)
+            fn_out, available_actions_input = self.function_id_output(fully_connected, num_functions)
             # TODO: use mask on fn_out with available actions here? (faster?)
 
         with tf.variable_scope("args_out"):
@@ -132,13 +132,18 @@ class ModelEvolvable:
         self.assign_op = tf.group(*assign_ops)
         self.add_op = tf.group(*add_ops)
 
-        return block_inputs, policy, value, self.mutate_input
+        return block_inputs, policy, value, self.mutate_input, available_actions_input
+
+    def function_id_output(self, x, channels):
+        logits = layers.fully_connected(x, num_outputs=channels, activation_fn=None, variables_collections=[self.scope])
+        available_actions_input = tf.placeholder(dtype=tf.float32, shape=logits.shape)
+        masked_logits = tf.multiply(logits, available_actions_input)
+        return tf.math.argmax(masked_logits, axis=1), available_actions_input
 
     # from https://github.com/simonmeister/pysc2-rl-agents/blob/master/rl/networks/fully_conv.py#L76-L78
     def non_spatial_output(self, x, channels):
         logits = layers.fully_connected(x, num_outputs=channels, activation_fn=None, variables_collections=[self.scope])
-        # TODO: tf.math.argmax(input, axis) Returns the index with the largest value across axes of a tensor
-        return tf.nn.softmax(logits)
+        return tf.math.argmax(logits, axis=1)
 
     # from https://github.com/simonmeister/pysc2-rl-agents/blob/master/rl/networks/fully_conv.py#L80-L84
     def spatial_output(self, x):
@@ -149,8 +154,7 @@ class ModelEvolvable:
             logits = layers.flatten(tf.transpose(logits, [0, 3, 1, 2]))
         else:
             logits = layers.flatten(logits)
-        # TODO: tf.math.argmax(input, axis) Returns the index with the largest value across axes of a tensor
-        return tf.nn.softmax(logits)
+        return tf.math.argmax(logits, axis=1)
 
     def assign_tensors(self):
         return self.assign_op
