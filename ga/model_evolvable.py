@@ -103,7 +103,6 @@ class ModelEvolvable:
         with tf.variable_scope("fn_out"):
             # fully_connected to action id
             fn_out, available_actions_input = self.function_id_output(fully_connected, num_functions)
-            # TODO: use mask on fn_out with available actions here? (faster?)
 
         with tf.variable_scope("args_out"):
             # state to non-spacial/spatial action arguments (for each action type)

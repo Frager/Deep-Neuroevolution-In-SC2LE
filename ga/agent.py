@@ -1,6 +1,7 @@
-
+from common.random_util import RandomUtil as Random
 import numpy as np
 from ga.model_evolvable import ModelEvolvable as Model
+import time
 
 
 class TestAgent:
@@ -15,16 +16,22 @@ class TestAgent:
     def init_variables(self):
         self.session.run(self.variables_initializer())
 
-    def setup_model(self, start_seed, evolve_seeds=[]):
+    def setup_model(self, start_seed, evolve_seeds=None):
         self.model = Model(scope=self.model_config.scope)
         self.block_inputs, self.policy, self.value, self.mutate_inputs, self.available_actions_input = self.model.fully_conv(self.model_config)
         self.init_variables()
 
+        # # To Time evolution:
+        # for i in range(100):
+        #     start = time.clock()
+        #     self.model_assign_all((1, i), do_assign_add=True)
+        #     end = time.clock()
+        #     print("{}: time: {}".format(i, (end-start)))
 
-        # TODO: use this:
-        # self.model_assign_all(start_seed)
-        # for seed in evolve_seeds:
-        #     self.model_assign_all(seed, do_assign_add=True)
+        self.model_assign_all(start_seed)
+        if evolve_seeds is not None:
+            for seed in evolve_seeds:
+                self.model_assign_all(seed, do_assign_add=True)
 
         # for variable in self.model.variables_collection:
         #     print(variable.eval())
@@ -34,9 +41,8 @@ class TestAgent:
         sigma = start_seed[0]
         seed = start_seed[1]
         feed_dict = {}
-        np.random.seed(seed)
         for mutate_input in self.mutate_inputs:
-            feed_dict[mutate_input] = np.random.normal(0, sigma, mutate_input.shape)
+            feed_dict[mutate_input] = Random.get_random_values(mutate_input.shape, seed)
         if do_assign_add:
             self.session.run(self.model.assign_add_tensors(), feed_dict=feed_dict)
         else:
