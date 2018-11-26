@@ -23,7 +23,7 @@ class ModelEvolvable:
 
     def spacial_block(self, spacial_dims, channel_dims):
         # TODO: do I actually need batch dimension?
-        block_input = tf.placeholder(tf.float32, [None, len(channel_dims), spacial_dims[0], spacial_dims[1]])
+        block_input = tf.placeholder(tf.float32, [None, len(channel_dims), spacial_dims, spacial_dims])
         if self.data_format == DataFormat.NHWC:
             channel_axis = 3
             block = tf.transpose(block_input, [0, 2, 3, 1])  # NHWC -> NCHW
@@ -55,9 +55,9 @@ class ModelEvolvable:
 
     def broadcast_flat_feature(self, block_input, spacial_size, data_format):
         if data_format == DataFormat.NCHW:
-            block = tf.tile(tf.expand_dims(tf.expand_dims(block_input, 2), 3), [1, 1, *spacial_size])
+            block = tf.tile(tf.expand_dims(tf.expand_dims(block_input, 2), 3), [1, 1, spacial_size, spacial_size])
         else:
-            block = tf.tile(tf.expand_dims(tf.expand_dims(block_input, 1), 2), [1, *spacial_size, 1])
+            block = tf.tile(tf.expand_dims(tf.expand_dims(block_input, 1), 2), [1, spacial_size, spacial_size, 1])
         return block
 
     def fully_conv(self, model_config):

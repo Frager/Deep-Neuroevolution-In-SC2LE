@@ -47,7 +47,7 @@ class TestAgent:
             self.session.run(self.model.assign_add_tensors(), feed_dict=feed_dict)
         else:
             self.session.run(self.model.assign_tensors(), feed_dict=feed_dict)
-        print(self.model.variables_collection[0].eval())
+        print(self.model.variables_collection[0].eval(session=self.session))
 
     def compress_model(self):
         return self.model.compress()
