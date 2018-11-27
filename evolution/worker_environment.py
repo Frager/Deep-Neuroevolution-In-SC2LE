@@ -7,9 +7,9 @@ import common.env as environmrnt
 from pysc2.env import sc2_env
 from common.env_parameters import *
 import importlib
-from ga.model_input import ModelInput
-from ga.model_output import ModelOutput
-from ga.model_config import ModelConfig
+from evolution.model_input import ModelInput
+from evolution.model_output import ModelOutput
+from evolution.model_config import ModelConfig
 from common.env_wrapper import EnvWrapper
 from common.feature_dimensions import NUM_FUNCTIONS
 from common.enums import ModelDataFormat as DataFormat

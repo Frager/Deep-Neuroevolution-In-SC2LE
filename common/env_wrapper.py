@@ -13,7 +13,7 @@ class EnvWrapper:
 
     def step(self, action):
         processed_actions = self.process_action(action)
-        print(processed_actions)
+        # print(processed_actions)
         timesteps = self.env.step(processed_actions)
         return self.preprocess_timesteps(timesteps)
 
@@ -21,11 +21,13 @@ class EnvWrapper:
         obs_raw = [timestep.observation for timestep in timesteps]
         available_actions_raw = [ob.available_actions for ob in obs_raw]
         rewards = [timestep.reward for timestep in timesteps]
+        score_cumulative = [timestep.observation['score_cumulative'] for timestep in timesteps]
         dones = [timestep.last() for timestep in timesteps]
         available_actions = [self.preprocessor.preprocess_available_actions(available_actions_raw)]
         processed_obs = self.preprocessor.preprocess_observations(obs_raw)
         return {'observation': processed_obs,
                 'rewards': rewards,
+                'score_cumulative': score_cumulative,
                 'dones': dones,
                 'available_actions': available_actions}
 
@@ -37,3 +39,6 @@ class EnvWrapper:
 
     def action_spec(self):
         return self.env.action_spec
+
+    def close(self):
+        self.env.close()

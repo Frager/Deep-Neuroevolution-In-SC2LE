@@ -1,5 +1,5 @@
 # A run loop for agent/environment interactions
-from ga.model_evolvable import CompressedModel
+from evolution.model_evolvable import CompressedModel
 import time
 
 
@@ -37,5 +37,5 @@ def run_loop(agent, env, model_config, max_frames=0, max_episodes=0):
         elapsed_time = time.time() - start_time
         print("Took %.3f seconds for %s steps: %.3f fps" % (
             elapsed_time, total_frames, total_frames / elapsed_time))
-
+        return timestep['score_cumulative']
 

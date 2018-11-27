@@ -1,15 +1,15 @@
 import sys
 import common.env as env
-import ga.run_loop as runner
+import evolution.run_loop as runner
 from absl import flags
 from pysc2.env import sc2_env
 from pysc2.lib import point_flag
-from ga.model_input import ModelInput
-from ga.model_output import ModelOutput
+from evolution.model_input import ModelInput
+from evolution.model_output import ModelOutput
 import tensorflow as tf
 import common.feature_dimensions as feature_dims
 from common.enums import ModelDataFormat as DataFormat
-from ga.model_config import ModelConfig
+from evolution.model_config import ModelConfig
 from common.env_wrapper import EnvWrapper
 from common.feature_dimensions import NUM_FUNCTIONS
 
@@ -38,7 +38,7 @@ if __name__ == '__main__':
     flags.DEFINE_integer("max_episodes", 0, "Total episodes.")
     flags.DEFINE_integer("step_mul", 8, "Game steps per agent step.")
 
-    flags.DEFINE_string("agent", "ga.agent.TestAgent",
+    flags.DEFINE_string("agent", "evolution.agent.TestAgent",
                         "Which agent to run, as a python path to an Agent class.")
     flags.DEFINE_enum("agent_race", "random", sc2_env.Race._member_names_,  # pylint: disable=protected-access
                       "Agent 1's race.")
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     players = []
 
     agent_module, agent_name = FLAGS.agent.rsplit(".", 1)
-    # agent_cls = ga.agent
+    # agent_cls = evolution.agent
     agent_cls = getattr(importlib.import_module(agent_module), agent_name)
     agent_classes.append(agent_cls)
 
@@ -73,10 +73,9 @@ if __name__ == '__main__':
 
     flat_feature_names = ['player', 'score_cumulative']
     flat_feature_input = ModelInput('flat', flat_feature_names, feature_dims.get_flat_feature_dims(flat_feature_names))
-    size = FLAGS.feature_minimap_size
-    minimap_input = ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), size)
-    size = FLAGS.feature_screen_size
-    screen_input = ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), size)
+    spacial_size = FLAGS.feature_minimap_size[0]
+    minimap_input = ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), spacial_size)
+    screen_input = ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), spacial_size)
     feature_inputs = [minimap_input, screen_input, flat_feature_input]
 
     arg_outputs = []
@@ -85,7 +84,7 @@ if __name__ == '__main__':
 
     scope = "test"
 
-    model_config = ModelConfig(feature_inputs, arg_outputs, size, NUM_FUNCTIONS, DataFormat.NHWC, scope)
+    model_config = ModelConfig(feature_inputs, arg_outputs, spacial_size, NUM_FUNCTIONS, DataFormat.NHWC, scope)
 
     # TODO: this code block probably goes in Worker class
     sc2_env = env.make_env(map_name=FLAGS.map,

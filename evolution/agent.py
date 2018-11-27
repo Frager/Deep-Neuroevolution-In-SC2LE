@@ -1,6 +1,6 @@
 from common.random_util import RandomUtil as Random
 import numpy as np
-from ga.model_evolvable import ModelEvolvable as Model
+from evolution.model_evolvable import ModelEvolvable as Model
 import time
 
 
@@ -17,9 +17,10 @@ class TestAgent:
         self.session.run(self.variables_initializer())
 
     def setup_model(self, start_seed, evolve_seeds=None):
-        self.model = Model(scope=self.model_config.scope)
-        self.block_inputs, self.policy, self.value, self.mutate_inputs, self.available_actions_input = self.model.fully_conv(self.model_config)
-        self.init_variables()
+        if self.model is None:
+            self.model = Model(scope=self.model_config.scope)
+            self.block_inputs, self.policy, self.value, self.mutate_inputs, self.available_actions_input = self.model.fully_conv(self.model_config)
+            self.init_variables()
 
         # # To Time evolution:
         # for i in range(100):
