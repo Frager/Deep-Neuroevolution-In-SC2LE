@@ -15,6 +15,7 @@ from common.feature_dimensions import NUM_FUNCTIONS
 from common.enums import ModelDataFormat as DataFormat
 import common.feature_dimensions as feature_dims
 
+
 class WorkerEnvoronment(Task):
     _agent = None
     _env = None

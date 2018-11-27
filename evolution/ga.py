@@ -48,7 +48,7 @@ def get_result(task):
     # TODO: try catch block
     result = task.get()
     # delete result from backend (in this case redis)
-    task.forget()
+    # task.forget() # Not supported by rabbitrq (works with redis)
     return result
 
 

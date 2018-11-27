@@ -1,19 +1,10 @@
-from celery import Celery
-from evolution.worker_environment import WorkerEnvoronment
+from evolution.celery_app import app
 import time
-
-
-app = Celery('tasks')
-app.conf.BROKER_URL = 'redis://192.168.99.100:32768/0'
-app.conf.CELERY_RESULT_BACKEND = "redis"
-app.conf.CELERY_REDIS_HOST = "192.168.99.100"
-app.conf.CELERY_REDIS_PORT = 32768
-app.conf.CELERY_REDIS_DB = 0
+from evolution.worker_environment import WorkerEnvoronment
 
 
 @app.task(base=WorkerEnvoronment)
 def evaluate_model(compressed_model, max_frames=0, max_episodes=1):
-    print('task started')
     reward = run_loop(compressed_model, evaluate_model.agent, evaluate_model.env,
                       max_frames=max_frames,
                       max_episodes=max_episodes)
