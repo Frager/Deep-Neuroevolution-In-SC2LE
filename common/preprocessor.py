@@ -41,8 +41,8 @@ class Preprocessor:
         for arg in function_args:
             action_arg = action_args[arg]
             if is_spacial[arg]:
-                x = action_arg % self.model_config.size.x
-                y = action_arg // self.model_config.size.y
+                x = action_arg % self.model_config.size
+                y = action_arg // self.model_config.size
                 action_arg = [x, y]
             processed_args.append(action_arg)
         return FunctionCall(chosen_function.id, processed_args)
