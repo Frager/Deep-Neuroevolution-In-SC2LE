@@ -2,26 +2,25 @@ import tensorflow as tf
 from tensorflow.contrib import layers
 import numpy as np
 from common.enums import ModelDataFormat as DataFormat
+from evolution.model_base import BaseModel
 
 
-class ModelEvolvable:
+class ModelEvolvable(BaseModel):
 
     def __init__(self, scope):
+        super(ModelEvolvable, self).__init__(scope)
+
         # seeds : (sigma, seed)
         self.start_seed = None
         self.evolve_seeds = []
-        self.scope = scope
 
-        self.add_tensors = {}
-        self.variables_collection = []
-        self.weights_collection = []
         self.data_format = None
 
         self.mutate_input = []
         self.assign_op = None
         self.add_op = None
 
-    def spacial_block(self, spacial_dims, channel_dims):
+    def spacial_block(self, name,  spacial_dims, channel_dims):
         # TODO: do I actually need batch dimension?
         block_input = tf.placeholder(tf.float32, [None, len(channel_dims), spacial_dims, spacial_dims])
         if self.data_format == DataFormat.NHWC:
@@ -35,17 +34,15 @@ class ModelEvolvable:
             if d > 1:
                 block[i] = tf.one_hot(tf.to_int32(tf.squeeze(block[i], axis=channel_axis)), d, axis=channel_axis)
                 # TODO: check if convolution of one_hot encoded spacial input is correct
-                block[i] = layers.conv2d(block[i], num_outputs=max(1, round(np.log2(d))), kernel_size=1
-                                         , data_format=self.data_format.value, variables_collections=[self.scope])
+                block[i] = self.conv(block[i], name + '/one_hot_conv_' + str(i), kernel_size=1, num_outputs=max(1, int(round(np.log2(d)))), stride=1,
+                                     padding="SAME", bias=True)
             else:
                 block[i] = tf.log(block[i] + 1.0)
         block = tf.concat(block, axis=channel_axis)
 
         # TODO: should I set reuse=True (for all variables in this scope)
-        conv1 = layers.conv2d(block, num_outputs=16, kernel_size=5, data_format=self.data_format.value,
-                              variables_collections=[self.scope])
-        conv2 = layers.conv2d(conv1, num_outputs=32, kernel_size=3, data_format=self.data_format.value,
-                              variables_collections=[self.scope])
+        conv1 = self.conv(block, name + '/conv_1', kernel_size=5, num_outputs=16, stride=1, padding="SAME", bias=True)
+        conv2 = self.conv(conv1, name + '/conv_2', kernel_size=3, num_outputs=32, stride=1, padding="SAME", bias=True)
         return conv2, block_input
 
     def non_spacial_block(self, dim, spacial_size):
@@ -71,18 +68,17 @@ class ModelEvolvable:
         block_inputs = {}
         blocks = []
         for feature_input in feature_inputs:
-            with tf.variable_scope(feature_input.get_feature_names_as_scope()):
-                if feature_input.is_spacial:
-                    block, spacial_input = self.spacial_block(feature_input.get_spacial_dimensions(),
-                                                              feature_input.get_channel_dimensions())
-                    block_inputs[feature_input.input_name] = spacial_input
-                    blocks.append(block)
-                else:
-                    # TODO: what about features of variable dimensions? like multi_select, alerts, build_queue ...
-                    block, non_spacial_input = self.non_spacial_block(np.sum(feature_input.get_channel_dimensions()),
-                                                                      spacial_size)
-                    block_inputs[feature_input.input_name] = non_spacial_input
-                    blocks.append(block)
+            if feature_input.is_spacial:
+                block, spacial_input = self.spacial_block(feature_input.input_name,
+                                                          feature_input.get_spacial_dimensions(),
+                                                          feature_input.get_channel_dimensions())
+                block_inputs[feature_input.input_name] = spacial_input
+                blocks.append(block)
+            else:
+                block, non_spacial_input = self.non_spacial_block(np.sum(feature_input.get_channel_dimensions()),
+                                                                  spacial_size)
+                block_inputs[feature_input.input_name] = non_spacial_input
+                blocks.append(block)
         if self.data_format == DataFormat.NCHW:
             state = tf.concat(blocks, axis=1)
         else:
@@ -91,28 +87,28 @@ class ModelEvolvable:
         # from https://github.com/simonmeister/pysc2-rl-agents/blob/master/rl/networks/fully_conv.py#L131-L137
         # state to non_spacial action policy and value
         flat_state = layers.flatten(state)
-        fully_connected = layers.fully_connected(flat_state, num_outputs=256, activation_fn=tf.nn.relu,
-                                                 variables_collections=[self.scope])
+        fully_connected = tf.nn.relu(self.dense(flat_state, 'flat_state', size=256, bias=True))
 
-        with tf.variable_scope("value"):
-            value = layers.fully_connected(fully_connected, num_outputs=1, activation_fn=None,
-                                           variables_collections=[self.scope])
-            # tf.reshape(t, -1) flattens t
-            value = tf.reshape(value, [-1])
+        value = self.dense(fully_connected, 'value', size=1, bias=True)
+        # tf.reshape(t, -1) flattens t
+        value = tf.reshape(value, [-1])
 
-        with tf.variable_scope("fn_out"):
-            # fully_connected to action id
-            fn_out, available_actions_input = self.function_id_output(fully_connected, num_functions)
+        # fully_connected to action id
+        fn_out, available_actions_input = self.function_id_output(fully_connected, num_functions)
 
-        with tf.variable_scope("args_out"):
-            # state to non-spacial/spatial action arguments (for each action type)
-            args_out = {}
-            for arg_output in arg_outputs:
-                if arg_output.is_spacial:
-                    arg_out = self.spatial_output(state)
-                else:
-                    arg_out = self.non_spatial_output(fully_connected, arg_output.arg_size)
-                args_out[arg_output.arg_type] = arg_out
+        # state to non-spacial/spatial action arguments (for each action type)
+        spacial = 0
+        non_spacial = 0
+        args_out = {}
+        for arg_output in arg_outputs:
+            if arg_output.is_spacial:
+                arg_out = self.spatial_output(state, 'arg_out_spacial_' + str(spacial))
+                spacial += 1
+            else:
+                arg_out = self.non_spatial_output(fully_connected, 'arg_out_non_spacial_' + str(non_spacial),
+                                                  arg_output.arg_size)
+                non_spacial += 1
+            args_out[arg_output.arg_type] = arg_out
 
         policy = (fn_out, args_out)
         self.variables_collection = tf.get_collection(self.scope)
@@ -120,34 +116,30 @@ class ModelEvolvable:
         # TODO: this probably belongs in another class
         assign_ops = []
         add_ops = []
-        for variable in self.variables_collection:
-            if 'weights' in variable.name:
-                self.weights_collection.append(variable)
-                placeholder = tf.placeholder(dtype=tf.float32, shape=variable.shape)
-                self.mutate_input.append(placeholder)
-                assign_ops.append(variable.assign(placeholder))
-                add_ops.append(variable.assign_add(placeholder))
-                tf.add_to_collection('mutate_input', placeholder)
+        for variable in self.weights:
+            placeholder = tf.placeholder(dtype=tf.float32, shape=variable.shape)
+            self.mutate_input.append(placeholder)
+            assign_ops.append(variable.assign(placeholder))
+            add_ops.append(variable.assign_add(placeholder))
         self.assign_op = tf.group(*assign_ops)
         self.add_op = tf.group(*add_ops)
 
         return block_inputs, policy, value, self.mutate_input, available_actions_input
 
     def function_id_output(self, x, channels):
-        logits = layers.fully_connected(x, num_outputs=channels, activation_fn=None, variables_collections=[self.scope])
+        logits = self.dense(x, 'func_id', size=channels, bias=True)
         available_actions_input = tf.placeholder(dtype=tf.float32, shape=logits.shape)
         masked_logits = tf.multiply(logits, available_actions_input)
         return tf.math.argmax(masked_logits, axis=1), available_actions_input
 
     # from https://github.com/simonmeister/pysc2-rl-agents/blob/master/rl/networks/fully_conv.py#L76-L78
-    def non_spatial_output(self, x, channels):
-        logits = layers.fully_connected(x, num_outputs=channels, activation_fn=None, variables_collections=[self.scope])
+    def non_spatial_output(self, x, name, channels):
+        logits = self.dense(x, name, size=channels, bias=True)
         return tf.math.argmax(logits, axis=1)
 
     # from https://github.com/simonmeister/pysc2-rl-agents/blob/master/rl/networks/fully_conv.py#L80-L84
-    def spatial_output(self, x):
-        logits = layers.conv2d(x, num_outputs=1, kernel_size=1, stride=1, activation_fn=None,
-                               data_format=self.data_format.value, variables_collections=[self.scope])
+    def spatial_output(self, x, name):
+        logits = self.conv(x, name, kernel_size=1, num_outputs=1, stride=1, padding="SAME", bias=True)
         if self.data_format == DataFormat.NHWC:
             # return output back to NCHW format
             logits = layers.flatten(tf.transpose(logits, [0, 3, 1, 2]))

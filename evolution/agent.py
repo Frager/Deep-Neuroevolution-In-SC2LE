@@ -29,6 +29,7 @@ class TestAgent:
         #     end = time.clock()
         #     print("{}: time: {}".format(i, (end-start)))
 
+        # TODO: Xavier Initialisation
         self.model_assign_all(start_seed)
         if evolve_seeds is not None:
             for seed in evolve_seeds:
@@ -48,7 +49,7 @@ class TestAgent:
             self.session.run(self.model.assign_add_tensors(), feed_dict=feed_dict)
         else:
             self.session.run(self.model.assign_tensors(), feed_dict=feed_dict)
-        print(self.model.variables_collection[0].eval(session=self.session))
+        print(self.model.weights[0].eval(session=self.session))
 
     def compress_model(self):
         return self.model.compress()
