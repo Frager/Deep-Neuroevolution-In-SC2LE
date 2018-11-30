@@ -8,7 +8,7 @@ class TestAgent:
     def __init__(self, session, model_config, variables_initializer):
         self.session = session
         self.model = None
-        self.block_inputs = self.policy = self.value = self.mutate_inputs = None
+        self.block_inputs = self.policy = self.value = self.weight_placeholders = None
         self.model_config = model_config
         self.variables_initializer = variables_initializer
         self.available_actions_input = None
@@ -19,36 +19,44 @@ class TestAgent:
     def setup_model(self, start_seed, evolve_seeds=None):
         if self.model is None:
             self.model = Model(scope=self.model_config.scope)
-            self.block_inputs, self.policy, self.value, self.mutate_inputs, self.available_actions_input = self.model.fully_conv(self.model_config)
+            self.block_inputs, self.policy, self.value, self.weight_placeholders, self.available_actions_input = self.model.fully_conv(self.model_config)
             self.init_variables()
 
         # # To Time evolution:
         # for i in range(100):
         #     start = time.clock()
-        #     self.model_assign_all((1, i), do_assign_add=True)
+        #     self.model_initialize(start_seed[1])
         #     end = time.clock()
         #     print("{}: time: {}".format(i, (end-start)))
 
-        # TODO: Xavier Initialisation
-        self.model_assign_all(start_seed)
+        self.model_initialize(start_seed[1])
         if evolve_seeds is not None:
             for seed in evolve_seeds:
-                self.model_assign_all(seed, do_assign_add=True)
+                self.model_evolve(seed[1])
 
         # for variable in self.model.variables_collection:
         #     print(variable.eval())
         return
 
-    def model_assign_all(self, start_seed, do_assign_add=False):
-        sigma = start_seed[0]
-        seed = start_seed[1]
+    def model_initialize(self, start_seed):
         feed_dict = {}
-        for mutate_input in self.mutate_inputs:
-            feed_dict[mutate_input] = Random.get_random_values(mutate_input.shape, seed)
-        if do_assign_add:
-            self.session.run(self.model.assign_add_tensors(), feed_dict=feed_dict)
-        else:
-            self.session.run(self.model.assign_tensors(), feed_dict=feed_dict)
+        # xavier initialize weights
+        for placeholder, n_in_out in zip(self.weight_placeholders, self.model.weights_in_out):
+            feed_dict[placeholder] = Random.xavier_initializer(placeholder.shape, n_in_out[0], n_in_out[1], start_seed)
+        self.session.run(self.model.assign_tensors(), feed_dict=feed_dict)
+
+        # set biases to zeros
+        self.session.run(self.model.reset_bias_op)
+        # TODO: delete when finished testing
+        print(self.model.biases[0].eval(session=self.session))
+
+    def model_evolve(self, evolve_seed):
+        feed_dict = {}
+        for placeholder in self.weight_placeholders:
+            feed_dict[placeholder] = Random.get_random_values(placeholder.shape, evolve_seed)
+        self.session.run(self.model.assign_add_tensors(), feed_dict=feed_dict)
+        # TODO: what about biases?
+        # TODO: delete when finished testing
         print(self.model.weights[0].eval(session=self.session))
 
     def compress_model(self):

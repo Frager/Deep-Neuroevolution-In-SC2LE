@@ -19,3 +19,8 @@ class RandomUtil:
     def get_random_values(cls, shape, seed):
         np.random.seed(seed)
         return np.random.choice(cls._random_table, shape)
+
+    @classmethod
+    def xavier_initializer(cls, shape, num_in, num_out, seed):
+        np.random.seed(seed)
+        return np.random.rand(*shape) * np.sqrt(1/(num_in+num_out))

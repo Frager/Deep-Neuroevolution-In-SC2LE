@@ -16,9 +16,10 @@ class ModelEvolvable(BaseModel):
 
         self.data_format = None
 
-        self.mutate_input = []
+        self.weight_placeholders = []
         self.assign_op = None
         self.add_op = None
+        self.reset_bias_op = None
 
     def spacial_block(self, name,  spacial_dims, channel_dims):
         # TODO: do I actually need batch dimension?
@@ -40,7 +41,6 @@ class ModelEvolvable(BaseModel):
                 block[i] = tf.log(block[i] + 1.0)
         block = tf.concat(block, axis=channel_axis)
 
-        # TODO: should I set reuse=True (for all variables in this scope)
         conv1 = self.conv(block, name + '/conv_1', kernel_size=5, num_outputs=16, stride=1, padding="SAME", bias=True)
         conv2 = self.conv(conv1, name + '/conv_2', kernel_size=3, num_outputs=32, stride=1, padding="SAME", bias=True)
         return conv2, block_input
@@ -111,20 +111,9 @@ class ModelEvolvable(BaseModel):
             args_out[arg_output.arg_type] = arg_out
 
         policy = (fn_out, args_out)
-        self.variables_collection = tf.get_collection(self.scope)
+        self.create_assign_operations()
 
-        # TODO: this probably belongs in another class
-        assign_ops = []
-        add_ops = []
-        for variable in self.weights:
-            placeholder = tf.placeholder(dtype=tf.float32, shape=variable.shape)
-            self.mutate_input.append(placeholder)
-            assign_ops.append(variable.assign(placeholder))
-            add_ops.append(variable.assign_add(placeholder))
-        self.assign_op = tf.group(*assign_ops)
-        self.add_op = tf.group(*add_ops)
-
-        return block_inputs, policy, value, self.mutate_input, available_actions_input
+        return block_inputs, policy, value, self.weight_placeholders, available_actions_input
 
     def function_id_output(self, x, channels):
         logits = self.dense(x, 'func_id', size=channels, bias=True)
@@ -152,6 +141,22 @@ class ModelEvolvable(BaseModel):
 
     def assign_add_tensors(self):
         return self.add_op
+
+    def create_assign_operations(self):
+        assign_ops = []
+        add_ops = []
+        for variable in self.weights:
+            placeholder = tf.placeholder(dtype=tf.float32, shape=variable.shape)
+            self.weight_placeholders.append(placeholder)
+            assign_ops.append(variable.assign(placeholder))
+            add_ops.append(variable.assign_add(placeholder))
+        self.assign_op = tf.group(*assign_ops)
+        self.add_op = tf.group(*add_ops)
+
+        reset_bias_ops = []
+        for variable in self.biases:
+            reset_bias_ops.append(variable.assign(tf.zeros(variable.shape, dtype=tf.float32)))
+        self.reset_bias_op = tf.group(*reset_bias_ops)
 
     def compress(self):
         return CompressedModel(self.start_seed, self.evolve_seeds)

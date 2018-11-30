@@ -3,8 +3,6 @@ import tensorflow as tf
 
 class BaseModel:
     def __init__(self, scope):
-        self.weights_num_in = []
-        self.weights_num_out = []
         self.weights_in_out = []
         self.weights = []
         self.biases = []
