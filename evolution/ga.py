@@ -12,18 +12,22 @@ class FinishedTask:
 # from https://towardsdatascience.com/paper-repro-deep-neuroevolution-756871e00a66
 class GA:
     def __init__(self, population, compressed_models, env_params):
-        self.current_results = list()
-        self.current_generation = list()
         self.population = population
-        self.compressed_models = [CompressedModel() for _ in range(population)] \
-            if compressed_models is None else compressed_models
+        self.compressed_models = list()
+        if compressed_models is None:
+            self.compressed_models = [CompressedModel() for _ in range(population)]
+        else:
+            self.compressed_models = compressed_models
+            if len(compressed_models) < population:
+                self.compressed_models += [CompressedModel() for _ in range(population-len(self.compressed_models))]
         self.env_params = env_params
+        self.max_no_ops = 0
 
     def get_best_models(self):
         tasks = list()
         for model in self.compressed_models:
             # queue model evaluations
-            tasks.append(evaluate_model.delay(model, self.env_params))
+            tasks.append(evaluate_model.delay(model, self.env_params, self.max_no_ops))
         while True:
             # TODO: handle dropped tasks
             # check for finished tasks and get results
@@ -38,9 +42,10 @@ class GA:
         scored_models.sort(key=lambda x: x[1], reverse=True)
         return scored_models
 
-    def evolve_iteration(self, truncation=10, max_eval=5000, max_noop=30):
+    def evolve_iteration(self, truncation=10, max_eval=5000, max_no_ops=30):
+        self.max_no_ops = max_no_ops
         scored_models = self.get_best_models()
-        scores = [s for _, s in scored_models]
+        scores = [s if s >= 0 else 0 for _, s in scored_models]   # don't calculate no_op penalties
         median_score = np.median(scores)
         mean_score = np.mean(scores)
         max_score = scored_models[0][1]
@@ -48,10 +53,14 @@ class GA:
         # Elitism
         self.compressed_models = [scored_models[0][0]]
         for _ in range(self.population):
-            model = deepcopy(scored_models[np.random.choice(len(scored_models))][0])
+            choice = np.random.choice(len(scored_models))
+            if scored_models[choice][1] <= 0:
+                model = CompressedModel()   # is model scored 0 try a new model instead
+            else:
+                model = deepcopy(scored_models[choice][0])
             model.evolve()
             self.compressed_models.append(model)
-        return median_score, mean_score, max_score
+        return scored_models, max_score, mean_score, median_score
 
 
 # convert score_cumulative array to a singe score value
