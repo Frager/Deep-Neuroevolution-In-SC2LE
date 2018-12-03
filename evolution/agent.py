@@ -29,11 +29,11 @@ class TestAgent:
         #     end = time.clock()
         #     print("{}: time: {}".format(i, (end-start)))
 
-        self.model_initialize(start_seed[1])
+        self.model_initialize(start_seed)
         if evolve_seeds is not None:
             for seed in evolve_seeds:
-                self.model_evolve(seed[1])
-
+                self.model_evolve(seed)
+        print('model({}) evolved with {} evolve seeds'.format(start_seed, len(evolve_seeds)))
         # for variable in self.model.variables_collection:
         #     print(variable.eval())
         return
@@ -47,8 +47,6 @@ class TestAgent:
 
         # set biases to zeros
         self.session.run(self.model.reset_bias_op)
-        # TODO: delete when finished testing
-        print(self.model.biases[0].eval(session=self.session))
 
     def model_evolve(self, evolve_seed):
         feed_dict = {}
@@ -56,8 +54,6 @@ class TestAgent:
             feed_dict[placeholder] = Random.get_random_values(placeholder.shape, evolve_seed)
         self.session.run(self.model.assign_add_tensors(), feed_dict=feed_dict)
         # TODO: what about biases?
-        # TODO: delete when finished testing
-        print(self.model.weights[0].eval(session=self.session))
 
     def compress_model(self):
         return self.model.compress()

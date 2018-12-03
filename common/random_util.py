@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 
 class RandomUtil:
@@ -24,3 +25,9 @@ class RandomUtil:
     def xavier_initializer(cls, shape, num_in, num_out, seed):
         np.random.seed(seed)
         return np.random.rand(*shape) * np.sqrt(1/(num_in+num_out))
+
+    @classmethod
+    def get_random_seed(cls):
+        random_bytes = os.urandom(4)
+        seed = int.from_bytes(random_bytes, byteorder="big")
+        return seed

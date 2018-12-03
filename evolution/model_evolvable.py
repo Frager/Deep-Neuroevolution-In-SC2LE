@@ -3,7 +3,7 @@ from tensorflow.contrib import layers
 import numpy as np
 from common.enums import ModelDataFormat as DataFormat
 from evolution.model_base import BaseModel
-
+from common.random_util import RandomUtil
 
 class ModelEvolvable(BaseModel):
 
@@ -163,10 +163,8 @@ class ModelEvolvable(BaseModel):
 
 
 def random_seed():
-    # TODO: create random seed (independent from tf)
-    sigma = 0.5
-    seed = 123
-    return sigma, seed
+    seed = RandomUtil.get_random_seed()
+    return seed
 
 
 class CompressedModel:
@@ -175,6 +173,6 @@ class CompressedModel:
         self.evolve_seeds = evolve_seeds if evolve_seeds is not None else []
         self.scope = scope
 
-    def evolve(self, sigma, rng_state=None):
-        self.evolve_seeds.append((sigma, rng_state if rng_state is not None else random_seed()))
+    def evolve(self, evolve_seed=None):
+        self.evolve_seeds.append(evolve_seed if evolve_seed is not None else random_seed())
 

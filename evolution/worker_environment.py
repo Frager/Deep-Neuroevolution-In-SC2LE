@@ -1,11 +1,8 @@
-
-import sys
 from absl import flags
 from celery import Task
 import tensorflow as tf
-import common.env as environmrnt
+import common.env as environment
 from pysc2.env import sc2_env
-from common.env_parameters import *
 import importlib
 from evolution.model_input import ModelInput
 from evolution.model_output import ModelOutput
@@ -14,16 +11,18 @@ from common.env_wrapper import EnvWrapper
 from common.feature_dimensions import NUM_FUNCTIONS
 from common.enums import ModelDataFormat as DataFormat
 import common.feature_dimensions as feature_dims
+from common.random_util import RandomUtil
 
-
-class WorkerEnvoronment(Task):
+class WorkerEnvironment(Task):
     _agent = None
     _env = None
     _sess = None
     _model_config = None
+    _env_params = dict()
 
     def __init__(self):
         tf.reset_default_graph()
+        # sc2le needs flags parsed
         flags.FLAGS(['main.py'])
 
     @property
@@ -53,10 +52,6 @@ class WorkerEnvoronment(Task):
             self._env = self.setup_environment()
         return self._env
 
-    @env.setter
-    def env(self, value):
-        self._env = value
-
     @property
     def agent(self):
         if self._agent is None:
@@ -67,34 +62,58 @@ class WorkerEnvoronment(Task):
     def agent(self, value):
         self._agent = value
 
+    @property
+    def env_params(self):
+        return self._env_params
+
+    @env_params.setter
+    def env_params(self, params):
+        params_changed = False
+        for key, value in params.items():
+            if key in self._env_params.keys():
+                if self._env_params[key] == value:
+                    continue
+            self._env_params[key] = value
+            params_changed = True
+        if params_changed:
+            RandomUtil.reinitialize_random_table(size=params['random_table_size'],
+                                                 sigma=params['random_table_sigma'],
+                                                 seed=params['random_table_seed'])
+            self.setup_model_config()
+            self.setup_environment()
+            self.setup_agent()
+
     def setup_agent(self):
-        agent_module, agent_name = agent_class.rsplit(".", 1)
+        tf.reset_default_graph()
+        agent_module, agent_name = self._env_params['agent'].rsplit(".", 1)
         agent_cls = getattr(importlib.import_module(agent_module), agent_name)
-        agent = agent_cls(self.sess, self.model_config, tf.global_variables_initializer)
-        return agent
+        self._agent = agent_cls(self.sess, self.model_config, tf.global_variables_initializer)
+        return self._agent
 
     def setup_environment(self):
+        if self._env is not None:
+            self._env.close()
         players = list()
-        players.append(sc2_env.Agent(sc2_env.Race[agent_race]))
-        sc2_environment = environmrnt.make_env(map_name=map_name,
+        players.append(sc2_env.Agent(sc2_env.Race[self._env_params['agent_race']]))
+        sc2_environment = environment.make_env(map_name=self._env_params['map_name'],
                                                players=players,
                                                agent_interface_format=sc2_env.parse_agent_interface_format(
-                                                   feature_screen=feature_screen_size,
-                                                   feature_minimap=feature_minimap_size,
-                                                   rgb_screen=rgb_screen_size,
-                                                   rgb_minimap=rgb_minimap_size,
-                                                   action_space=action_space,
-                                                   use_feature_units=use_feature_units))
-        env_wrapper = EnvWrapper(sc2_environment, self.model_config)
-        return env_wrapper
+                                                   feature_screen=self._env_params['screen_size'],
+                                                   feature_minimap=self._env_params['minimap_size'],
+                                                   rgb_screen=self._env_params['rgb_screen_size'],
+                                                   rgb_minimap=self._env_params['rgb_minimap_size'],
+                                                   action_space=self._env_params['action_space'],
+                                                   use_feature_units=self._env_params['use_feature_units']))
+        self._env = EnvWrapper(sc2_environment, self.model_config)
+        return self._env
 
     def setup_model_config(self):
         flat_feature_names = ['player', 'score_cumulative']
         flat_feature_input = ModelInput('flat', flat_feature_names,
                                         feature_dims.get_flat_feature_dims(flat_feature_names))
-        size = feature_minimap_size
+        size = self._env_params['minimap_size']
         minimap_input = ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), size)
-        size = feature_screen_size
+        size = self._env_params['screen_size']
         screen_input = ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), size)
         feature_inputs = [minimap_input, screen_input, flat_feature_input]
 
@@ -104,5 +123,5 @@ class WorkerEnvoronment(Task):
 
         scope = "test"
 
-        model_config = ModelConfig(feature_inputs, arg_outputs, size, NUM_FUNCTIONS, DataFormat.NHWC, scope)
-        return model_config
+        self._model_config = ModelConfig(feature_inputs, arg_outputs, size, NUM_FUNCTIONS, DataFormat.NHWC, scope)
+        return self._model_config
