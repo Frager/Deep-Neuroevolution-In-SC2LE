@@ -42,7 +42,7 @@ class GA:
         scored_models.sort(key=lambda x: x[1], reverse=True)
         return scored_models
 
-    def evolve_iteration(self, truncation=10, max_eval=5000, max_no_ops=30):
+    def evolve_iteration(self, truncation=10, elites=1, max_eval=5000, max_no_ops=30):
         self.max_no_ops = max_no_ops
         scored_models = self.get_best_models()
         scores = [s if s >= 0 else 0 for _, s in scored_models]   # don't calculate no_op penalties
@@ -51,7 +51,7 @@ class GA:
         max_score = scored_models[0][1]
         scored_models = scored_models[:truncation]
         # Elitism
-        self.compressed_models = [scored_models[0][0]]
+        self.compressed_models = [scored_models[i][0] for i in range(elites)]
         for _ in range(self.population):
             choice = np.random.choice(len(scored_models))
             if scored_models[choice][1] <= 0:
