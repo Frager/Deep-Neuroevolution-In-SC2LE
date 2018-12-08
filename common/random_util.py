@@ -5,7 +5,7 @@ import os
 class RandomUtil:
     # TODO: manage hyper parameter in a separate class
     _sigma = 0.005      # influences random number range
-    _count = 1000       # number of random values to sample from (higher count is better for diversity, but slower)
+    _count = 10000       # number of random values to sample from (higher count is better for diversity, but slower)
     _table_seed = 123   # save these variables and use them for manager and workers
 
     np.random.seed(_table_seed)

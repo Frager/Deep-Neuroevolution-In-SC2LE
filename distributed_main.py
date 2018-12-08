@@ -38,7 +38,7 @@ flags.DEFINE_string("map", "MoveToBeacon", "Name of a map to use.")
 
 flags.DEFINE_float("random_table_sigma", 0.005, "Sigma for random table.")
 flags.DEFINE_integer("random_table_seed", 1234, "Random table initialisation seed")
-flags.DEFINE_integer("random_table_size", 1000, "Random table size")
+flags.DEFINE_integer("random_table_size", 10000, "Random table size")
 
 
 flags.DEFINE_bool("save", True, "save models?")
@@ -46,6 +46,7 @@ flags.DEFINE_string("save_to", "unnamed_experiment", "relative file path when sa
 flags.DEFINE_string("load_from", "", "relative file path for loading models")
 flags.DEFINE_integer("save_interval", 1, "save generations in intervals")
 
+flags.DEFINE_integer("max_generations", 0, "number of generations until the algorithm stops")
 
 flags.DEFINE_integer("population", 9, "population per generation")
 flags.DEFINE_integer("truncation", 5, "truncation ")
@@ -64,11 +65,14 @@ def main():
     load_from = FLAGS.load_from
     save_interval = FLAGS.save_interval
 
+    max_generations = FLAGS.max_generations
+
     work_dir = os.getcwd()
+    work_dir = os.path.join(work_dir, 'experiments')
 
     if load_from != '':
         load_path = os.path.join(work_dir, load_from)
-        models_load_path = os.path.join(load_path, 'Models')
+        models_load_path = os.path.join(load_path, 'models')
         models = load_models(models_load_path)
         parameters = load_dict(load_path, 'worker_parameters.json')
         ga_parameters = load_dict(load_path, 'ga_parameters.json')
@@ -79,12 +83,12 @@ def main():
     save_path = os.path.join(work_dir, save_to)
     save_dict(parameters, save_path, 'worker_parameters.json')
     save_dict(ga_parameters, save_path, 'ga_parameters.json')
-    models_save_path = os.path.join(save_path, 'Models')
+    models_save_path = os.path.join(save_path, 'models')
 
     ga = GA(population=ga_parameters['population'], compressed_models=models, env_params=parameters)
 
     generation = 0
-    while True:
+    while max_generations == 0 or generation < max_generations:
         generation += 1
         start = time.time()
         scored_models, max_score, mean_score, median_score = ga.evolve_iteration(elites=ga_parameters['elites'],

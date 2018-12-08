@@ -3,6 +3,7 @@ from evolution.model_evolvable import CompressedModel
 import time
 import numpy as np
 from copy import deepcopy
+from celery.states import FAILURE, SUCCESS, RETRY
 
 class FinishedTask:
     def __init__(self, result):
@@ -27,14 +28,20 @@ class GA:
         tasks = list()
         for model in self.compressed_models:
             # queue model evaluations
-            tasks.append(evaluate_model.delay(model, self.env_params, self.max_no_ops))
+            tasks.append(evaluate_model.delay(model, self.env_params, max_no_ops=self.max_no_ops))
         while True:
-            # TODO: handle dropped tasks
+            # TODO: handle exxeptions (and dropped tasks)
             # check for finished tasks and get results
             for i in range(len(tasks)):
-                if result_is_ready(tasks[i]) and not isinstance(tasks[i], FinishedTask):
-                    tasks[i] = FinishedTask(get_result(tasks[i]))
-            scores = [convert_result(task.result) for task in tasks]
+                if not isinstance(tasks[i], FinishedTask):
+                    if tasks[i].status == SUCCESS:
+                        tasks[i] = FinishedTask(get_result(tasks[i]))
+                    elif tasks[i].status == FAILURE:    # retry task
+                        print('Task Failed')
+                        tasks[i].forget()
+                        tasks[i] = evaluate_model.delay(
+                            self.compressed_models[i], self.env_params, max_no_ops=self.max_no_ops)
+            scores = [convert_result(task) for task in tasks]
             if all(score is not None for score in scores):
                 break
             time.sleep(1)
@@ -64,21 +71,22 @@ class GA:
 
 
 # convert score_cumulative array to a singe score value
-def convert_result(result):
-    if result is None:
-        return None
-    return result[0]
+def convert_result(task):
+    if isinstance(task, FinishedTask):
+        result = task.result
+        return result[0]
+    return None
 
 
 def result_is_ready(task):
-    if task.result is None:
-        return False
-    return True
+    if task.status == SUCCESS:
+        return True
+    return False
 
 
 def get_result(task):
     # TODO: try catch block
     result = task.get()
     # delete result from backend (in this case redis)
-    # task.forget() # Not supported by rabbitrq (works with redis)
+    task.forget()   # Not supported by rabbitrq (works with redis)
     return result

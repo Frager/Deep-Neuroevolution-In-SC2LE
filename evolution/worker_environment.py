@@ -13,6 +13,7 @@ from common.enums import ModelDataFormat as DataFormat
 import common.feature_dimensions as feature_dims
 from common.random_util import RandomUtil
 
+
 class WorkerEnvironment(Task):
     _agent = None
     _env = None
@@ -83,12 +84,18 @@ class WorkerEnvironment(Task):
             self.setup_environment()
             self.setup_agent()
 
+    def shut_down_env(self):
+        if self._env is not None:
+            self._env.close()
+        tf.reset_default_graph()
+
     def setup_agent(self):
         tf.reset_default_graph()
         agent_module, agent_name = self._env_params['agent'].rsplit(".", 1)
         agent_cls = getattr(importlib.import_module(agent_module), agent_name)
         self._agent = agent_cls(self.sess, self.model_config, tf.global_variables_initializer)
         return self._agent
+
 
     def setup_environment(self):
         if self._env is not None:

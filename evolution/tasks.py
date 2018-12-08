@@ -3,10 +3,14 @@ import time
 from evolution.worker_environment import WorkerEnvironment
 
 
-@app.task(base=WorkerEnvironment, autoretry_for=(Exception,), retry_kwargs={'max_retries': 5, 'countdown': 2},
-          retry_jitter=True)
-def evaluate_model(compressed_model, params, max_no_ops=0):
+# , autoretry_for=(Exception,),
+#           retry_kwargs={'max_retries': 5, 'countdown': 10}, retry_jitter=True)
+@app.task(base=WorkerEnvironment)
+def evaluate_model(compressed_model, params, max_no_ops=0, shut_down_env=False):
     # TODO: compare env_params and set up accordingly
+    if shut_down_env:
+        evaluate_model.shut_down_env()
+        return
     evaluate_model.env_params = params
     reward = run_loop(compressed_model, evaluate_model.agent, evaluate_model.env,
                       max_frames=params['step_mul']*params['max_agent_steps'],
