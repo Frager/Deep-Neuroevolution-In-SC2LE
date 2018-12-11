@@ -5,8 +5,8 @@ useradd -m docker && echo "docker:docker" | chpasswd && adduser docker sudo
 
 
 # download and install starcraft headless build + maps
-RUN wget http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.1.2.60604_2018_05_16.zip && \
-unzip -P iagreetotheeula SC2.4.1.2.60604_2018_05_16.zip -d ~/ && \
+RUN wget http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.6.2.69232.zip && \
+unzip -P iagreetotheeula SC2.4.6.2.69232.zip -d ~/ && \
 wget http://blzdistsc2-a.akamaihd.net/MapPacks/Melee.zip && \
 wget https://github.com/deepmind/pysc2/releases/download/v1.2/mini_games.zip && \
 unzip -P iagreetotheeula Melee.zip -d ~/StarCraftII/Maps && \

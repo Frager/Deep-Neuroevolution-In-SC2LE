@@ -24,11 +24,12 @@ class GA:
         self.env_params = env_params
         self.max_no_ops = 0
 
-    def get_best_models(self):
+    def get_best_models(self, models, env_params, max_no_ops, num_evaluations):
         tasks = list()
-        for model in self.compressed_models:
+        for model in models:
             # queue model evaluations
-            tasks.append(evaluate_model.delay(model, self.env_params, max_no_ops=self.max_no_ops))
+            tasks.append(evaluate_model.delay(model, env_params, max_no_ops=max_no_ops,
+                                              max_episodes=num_evaluations))
         while True:
             # TODO: handle exxeptions (and dropped tasks)
             # check for finished tasks and get results
@@ -40,24 +41,45 @@ class GA:
                         print('Task Failed')
                         tasks[i].forget()
                         tasks[i] = evaluate_model.delay(
-                            self.compressed_models[i], self.env_params, max_no_ops=self.max_no_ops)
+                            models[i], env_params, max_no_ops=max_no_ops,
+                            max_episodes=num_evaluations)
             scores = [convert_result(task) for task in tasks]
             if all(score is not None for score in scores):
                 break
             time.sleep(1)
-        scored_models = list(zip(self.compressed_models, scores))
+        scored_models = list(zip(models, scores))
         scored_models.sort(key=lambda x: x[1], reverse=True)
         return scored_models
 
-    def evolve_iteration(self, truncation=10, elites=1, max_eval=5000, max_no_ops=30):
+    def evolve_iteration(self, truncation=10, elites=1, elite_eval=5, max_no_ops=30):
         self.max_no_ops = max_no_ops
-        scored_models = self.get_best_models()
+        scored_models = self.get_best_models(models=self.compressed_models, env_params=self.env_params,
+                                             max_no_ops=self.max_no_ops, num_evaluations=1)
         scores = [s if s >= 0 else 0 for _, s in scored_models]   # don't calculate no_op penalties
-        median_score = np.median(scores)
-        mean_score = np.mean(scores)
-        max_score = scored_models[0][1]
+        all_median_score = np.median(scores)
+        all_mean_score = np.mean(scores)
+        all_max_score = scored_models[0][1]
+
+        all_stats = {
+            'max_score': all_max_score,
+            'mean_score': all_mean_score,
+            'median_score': all_median_score
+        }
         scored_models = scored_models[:truncation]
-        # Elitism
+        truncated_models = [s_m[0] for s_m in scored_models]
+        # Elitism (do more evaluations on truncated models)
+        scored_models = self.get_best_models(models=truncated_models, env_params=self.env_params,
+                                             max_no_ops=self.max_no_ops, num_evaluations=elite_eval)
+        scores = [s if s >= 0 else 0 for _, s in scored_models]
+        truncated_median_score = np.median(scores)
+        truncated_mean_score = np.mean(scores)
+        truncated_max_score = scored_models[0][1]
+        truncated_stats = {
+            'max_score': truncated_max_score,
+            'mean_score': truncated_mean_score,
+            'median_score': truncated_median_score
+        }
+
         self.compressed_models = [scored_models[i][0] for i in range(elites)]
         for _ in range(self.population):
             choice = np.random.choice(len(scored_models))
@@ -67,14 +89,17 @@ class GA:
                 model = deepcopy(scored_models[choice][0])
             model.evolve()
             self.compressed_models.append(model)
-        return scored_models, max_score, mean_score, median_score
+        return scored_models, truncated_stats, all_stats
 
 
 # convert score_cumulative array to a singe score value
 def convert_result(task):
     if isinstance(task, FinishedTask):
-        result = task.result
-        return result[0]
+        results = task.result
+        value = 0
+        for result in results:
+            value += result[0]
+        return value/len(results)
     return None
 
 

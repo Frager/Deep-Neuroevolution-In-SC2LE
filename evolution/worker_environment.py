@@ -96,7 +96,6 @@ class WorkerEnvironment(Task):
         self._agent = agent_cls(self.sess, self.model_config, tf.global_variables_initializer)
         return self._agent
 
-
     def setup_environment(self):
         if self._env is not None:
             self._env.close()
@@ -115,14 +114,16 @@ class WorkerEnvironment(Task):
         return self._env
 
     def setup_model_config(self):
-        flat_feature_names = ['player', 'score_cumulative']
-        flat_feature_input = ModelInput('flat', flat_feature_names,
-                                        feature_dims.get_flat_feature_dims(flat_feature_names))
-        size = self._env_params['minimap_size']
-        minimap_input = ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), size)
+        feature_inputs = list()
+        flat_feature_names = self._env_params['features_flat']
+        flat_feature_names = flat_feature_names.split(',')
+        feature_inputs.append(ModelInput('flat', flat_feature_names,
+                                         feature_dims.get_flat_feature_dims(flat_feature_names)))
+        if self._env_params['use_minimap']:
+            size = self._env_params['minimap_size']
+            feature_inputs.append(ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), size))
         size = self._env_params['screen_size']
-        screen_input = ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), size)
-        feature_inputs = [minimap_input, screen_input, flat_feature_input]
+        feature_inputs.append(ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), size))
 
         arg_outputs = []
         for arg_type in feature_dims.ACTION_TYPES:

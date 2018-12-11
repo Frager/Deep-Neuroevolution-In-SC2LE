@@ -59,6 +59,8 @@ if __name__ == '__main__':
     flags.DEFINE_string("map", "MoveToBeacon", "Name of a map to use.")
 
     flags.DEFINE_string("load_from", "", "relative file path for loading models")
+    flags.DEFINE_integer("gen", "1", "from generation")
+    flags.DEFINE_integer("top", "1", "model placement. Starting from the best = 1")
 
     # Not necessary when using app.run()
     FLAGS(sys.argv)
@@ -79,18 +81,21 @@ if __name__ == '__main__':
 
     load_path = os.path.join(work_dir, load_from)
     models_load_path = os.path.join(load_path, 'models')
-    models = load_models(models_load_path)
+    models = load_models(models_load_path, FLAGS.gen)
     parameters = load_dict(load_path, 'worker_parameters.json')
     ga_parameters = load_dict(load_path, 'ga_parameters.json')
 
     players.append(sc2_env.Agent(sc2_env.Race[parameters['agent_race']]))
 
-    flat_feature_names = ['player', 'score_cumulative']
-    flat_feature_input = ModelInput('flat', flat_feature_names, feature_dims.get_flat_feature_dims(flat_feature_names))
-    spacial_size = FLAGS.feature_minimap_size[0]
-    minimap_input = ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), spacial_size)
-    screen_input = ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), spacial_size)
-    feature_inputs = [minimap_input, screen_input, flat_feature_input]
+    feature_inputs = list()
+    flat_feature_names = parameters['features_flat']
+    flat_feature_names = flat_feature_names.split(',')
+    feature_inputs.append(ModelInput('flat', flat_feature_names, feature_dims.get_flat_feature_dims(flat_feature_names)))
+    if parameters['use_minimap']:
+        spacial_size = parameters['minimap_size']
+        feature_inputs.append(ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), spacial_size))
+    spacial_size = parameters['screen_size']
+    feature_inputs.append(ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), spacial_size))
 
     arg_outputs = []
     for arg_type in feature_dims.ACTION_TYPES:
@@ -115,4 +120,4 @@ if __name__ == '__main__':
     env = EnvWrapper(sc2_env, model_config)
     with tf.Session() as sess:
         agent = agent_cls(sess, model_config, tf.global_variables_initializer)
-        run_loop(models[0], agent, env, max_frames=0, max_episodes=0, max_no_ops=0)
+        run_loop(models[FLAGS.top - 1], agent, env, max_frames=0, max_episodes=0, max_no_ops=0)
