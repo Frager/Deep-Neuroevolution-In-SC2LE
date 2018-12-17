@@ -59,7 +59,7 @@ if __name__ == '__main__':
     flags.DEFINE_string("map", "MoveToBeacon", "Name of a map to use.")
 
     flags.DEFINE_string("load_from", "", "relative file path for loading models")
-    flags.DEFINE_integer("gen", "1", "from generation")
+    flags.DEFINE_integer("gen", "0", "from generation")
     flags.DEFINE_integer("top", "1", "model placement. Starting from the best = 1")
 
     # Not necessary when using app.run()
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     flat_feature_names = flat_feature_names.split(',')
     feature_inputs.append(ModelInput('flat', flat_feature_names, feature_dims.get_flat_feature_dims(flat_feature_names)))
     if parameters['use_minimap']:
-        spacial_size = parameters['minimap_size']
+        spacial_size = parameters['screen_size']
         feature_inputs.append(ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), spacial_size))
     spacial_size = parameters['screen_size']
     feature_inputs.append(ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), spacial_size))
@@ -112,9 +112,9 @@ if __name__ == '__main__':
                            players=players,
                            agent_interface_format=sc2_env.parse_agent_interface_format(
                                feature_screen=parameters['screen_size'],
-                               feature_minimap=parameters['minimap_size'],
+                               feature_minimap=parameters['screen_size'],
                                rgb_screen=parameters['rgb_screen_size'],
-                               rgb_minimap=parameters['rgb_minimap_size'],
+                               rgb_minimap=parameters['rgb_screen_size'],
                                action_space=parameters['action_space'],
                                use_feature_units=parameters['use_feature_units']))
     env = EnvWrapper(sc2_env, model_config)

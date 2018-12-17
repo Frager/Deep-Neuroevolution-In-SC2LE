@@ -8,7 +8,7 @@ class TestAgent:
     def __init__(self, session, model_config, variables_initializer):
         self.session = session
         self.model = None
-        self.block_inputs = self.policy = self.value = self.weight_placeholders = None
+        self.block_inputs = self.policy = self.value = self.weight_placeholders = self.bias_placeholders = None
         self.model_config = model_config
         self.variables_initializer = variables_initializer
         self.available_actions_input = None
@@ -19,7 +19,7 @@ class TestAgent:
     def setup_model(self, start_seed, evolve_seeds=None):
         if self.model is None:
             self.model = Model(scope=self.model_config.scope)
-            self.block_inputs, self.policy, self.value, self.weight_placeholders, self.available_actions_input = self.model.fully_conv(self.model_config)
+            self.block_inputs, self.policy, self.value, self.weight_placeholders, self.bias_placeholders, self.available_actions_input = self.model.fully_conv(self.model_config)
             self.init_variables()
 
         # # To Time evolution:
@@ -41,18 +41,19 @@ class TestAgent:
     def model_initialize(self, start_seed):
         feed_dict = {}
         # xavier initialize weights
+        Random.set_seed(start_seed)
         for placeholder, n_in_out in zip(self.weight_placeholders, self.model.weights_in_out):
-            feed_dict[placeholder] = Random.xavier_initializer(placeholder.shape, n_in_out[0], n_in_out[1], start_seed)
-        self.session.run(self.model.assign_tensors(), feed_dict=feed_dict)
-
-        # set biases to zeros
-        self.session.run(self.model.reset_bias_op)
+            feed_dict[placeholder] = Random.xavier_initializer(placeholder.shape, n_in_out[0], n_in_out[1])
+        self.session.run(self.model.initialize_tensors(), feed_dict=feed_dict)
 
     def model_evolve(self, evolve_seed):
         feed_dict = {}
+        Random.set_seed(evolve_seed)
         for placeholder in self.weight_placeholders:
-            feed_dict[placeholder] = Random.get_random_values(placeholder.shape, evolve_seed)
-        self.session.run(self.model.assign_add_tensors(), feed_dict=feed_dict)
+            feed_dict[placeholder] = Random.get_random_values(placeholder.shape)
+        for placeholder in self.bias_placeholders:
+            feed_dict[placeholder] = Random.get_random_values(placeholder.shape)
+        self.session.run(self.model.add_tensors(), feed_dict=feed_dict)
         # TODO: what about biases?
 
     def compress_model(self):
@@ -71,6 +72,8 @@ class TestAgent:
             [self.policy[0], self.policy[1], self.value],
             feed_dict=feed_dict
         )
+        if available_actions[0][action_id[0]] == 0:
+            action_id[0] = 0   # no_op
         return [action_id, action_args], value_estimate
 
     def input_to_feed_dict(self, obs):

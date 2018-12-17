@@ -8,10 +8,8 @@ from evolution.celery_app import app
 import time
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("screen_size", "32", "Resolution for screen feature layers.")
-flags.DEFINE_integer("minimap_size", "32", "Resolution for minimap feature layers.")
+flags.DEFINE_integer("screen_size", "24", "Resolution for screen feature layers.")
 flags.DEFINE_integer("rgb_screen_size", None, "Resolution for rendered screen.")
-flags.DEFINE_integer("rgb_minimap_size", None, "Resolution for rendered minimap.")
 flags.DEFINE_enum("action_space", None, sc2_env.ActionSpace._member_names_,  # pylint: disable=protected-access
                   "Which action space to use. Needed if you take both feature "
                   "and rgb observations.")
@@ -21,7 +19,7 @@ flags.DEFINE_bool("disable_fog", False, "Whether to disable Fog of War.")
 flags.DEFINE_integer("max_agent_steps", 0, "Total agent steps.")
 flags.DEFINE_integer("game_steps_per_episode", None, "Game steps per episode.")
 flags.DEFINE_integer("max_episodes", 1, "Total episodes.")
-flags.DEFINE_integer("step_mul", 8, "Game steps per agent step.")
+flags.DEFINE_integer("step_mul", 16, "Game steps per agent step.")
 flags.DEFINE_string("agent", "evolution.agent.TestAgent",
                     "Which agent to run, as a python path to an Agent class.")
 flags.DEFINE_enum("agent_race", "random", sc2_env.Race._member_names_,  # pylint: disable=protected-access
@@ -31,7 +29,7 @@ flags.DEFINE_enum("agent2_race", "random", sc2_env.Race._member_names_,  # pylin
                   "Agent 2's race.")
 flags.DEFINE_enum("difficulty", "very_easy", sc2_env.Difficulty._member_names_,  # pylint: disable=protected-access
                   "If agent2 is a built-in Bot, it's strength.")
-flags.DEFINE_string("map", "CollectMineralShards", "Name of a map to use.")
+flags.DEFINE_string("map", "MoveToBeacon", "Name of a map to use.")
 
 
 flags.DEFINE_float("random_table_sigma", 0.005, "Sigma for random table.")
@@ -47,7 +45,7 @@ flags.DEFINE_integer("save_interval", 1, "save generations in intervals")
 
 flags.DEFINE_integer("max_generations", 0, "number of generations until the algorithm stops")
 
-flags.DEFINE_integer("population", 9, "population per generation")
+flags.DEFINE_integer("population", 50, "population per generation")
 flags.DEFINE_integer("truncation", 5, "truncation ")
 flags.DEFINE_integer("elites", 1, "number of best models to keep unchanged in next generation")
 flags.DEFINE_integer("elite_evaluations", 2, "how often truncated models are evaluated to get elite")
@@ -107,9 +105,7 @@ def main():
 def parameters_from_flags():
     parameters = dict()
     parameters['screen_size'] = FLAGS.screen_size
-    parameters['minimap_size'] = FLAGS.minimap_size
     parameters['rgb_screen_size'] = FLAGS.rgb_screen_size
-    parameters['rgb_minimap_size'] = FLAGS.rgb_minimap_size
     parameters['action_space'] = FLAGS.action_space
     parameters['use_feature_units'] = FLAGS.use_feature_units
     parameters['disable_fog'] = FLAGS.disable_fog

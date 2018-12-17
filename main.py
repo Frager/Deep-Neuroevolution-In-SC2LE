@@ -18,9 +18,9 @@ import importlib
 if __name__ == '__main__':
     FLAGS = flags.FLAGS
     flags.DEFINE_bool("render", True, "Whether to render with pygame.")
-    point_flag.DEFINE_point("feature_screen_size", "32",
+    point_flag.DEFINE_point("feature_screen_size", "24",
                             "Resolution for screen feature layers.")
-    point_flag.DEFINE_point("feature_minimap_size", "32",
+    point_flag.DEFINE_point("feature_minimap_size", "24",
                             "Resolution for minimap feature layers.")
     point_flag.DEFINE_point("rgb_screen_size", None,
                             "Resolution for rendered screen.")
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     flags.DEFINE_integer("max_agent_steps", 0, "Total agent steps.")
     flags.DEFINE_integer("game_steps_per_episode", None, "Game steps per episode.")
     flags.DEFINE_integer("max_episodes", 0, "Total episodes.")
-    flags.DEFINE_integer("step_mul", 8, "Game steps per agent step.")
+    flags.DEFINE_integer("step_mul", 32, "Game steps per agent step.")
 
     flags.DEFINE_string("agent", "evolution.agent.TestAgent",
                         "Which agent to run, as a python path to an Agent class.")
@@ -71,12 +71,12 @@ if __name__ == '__main__':
     # so the environment knows how to set up the game
     players.append(sc2_env.Agent(sc2_env.Race[FLAGS.agent_race]))
 
-    flat_feature_names = ['player', 'score_cumulative']
+    flat_feature_names = ['player']
     flat_feature_input = ModelInput('flat', flat_feature_names, feature_dims.get_flat_feature_dims(flat_feature_names))
     spacial_size = FLAGS.feature_minimap_size[0]
-    minimap_input = ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), spacial_size)
+    # minimap_input = ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), spacial_size)
     screen_input = ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), spacial_size)
-    feature_inputs = [minimap_input, screen_input, flat_feature_input]
+    feature_inputs = [screen_input, flat_feature_input]
 
     arg_outputs = []
     for arg_type in feature_dims.ACTION_TYPES:
@@ -89,6 +89,7 @@ if __name__ == '__main__':
     # TODO: this code block probably goes in Worker class
     sc2_env = env.make_env(map_name=FLAGS.map,
                            players=players,
+                           step_mul=FLAGS.step_mul,
                            agent_interface_format=sc2_env.parse_agent_interface_format(
                                feature_screen=FLAGS.feature_screen_size,
                                feature_minimap=FLAGS.feature_minimap_size,

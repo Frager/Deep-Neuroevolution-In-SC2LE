@@ -103,11 +103,12 @@ class WorkerEnvironment(Task):
         players.append(sc2_env.Agent(sc2_env.Race[self._env_params['agent_race']]))
         sc2_environment = environment.make_env(map_name=self._env_params['map_name'],
                                                players=players,
+                                               step_mul=self._env_params['step_mul'],
                                                agent_interface_format=sc2_env.parse_agent_interface_format(
                                                    feature_screen=self._env_params['screen_size'],
-                                                   feature_minimap=self._env_params['minimap_size'],
+                                                   feature_minimap=self._env_params['screen_size'],
                                                    rgb_screen=self._env_params['rgb_screen_size'],
-                                                   rgb_minimap=self._env_params['rgb_minimap_size'],
+                                                   rgb_minimap=self._env_params['rgb_screen_size'],
                                                    action_space=self._env_params['action_space'],
                                                    use_feature_units=self._env_params['use_feature_units']))
         self._env = EnvWrapper(sc2_environment, self.model_config)
@@ -120,7 +121,7 @@ class WorkerEnvironment(Task):
         feature_inputs.append(ModelInput('flat', flat_feature_names,
                                          feature_dims.get_flat_feature_dims(flat_feature_names)))
         if self._env_params['use_minimap']:
-            size = self._env_params['minimap_size']
+            size = self._env_params['screen_size']
             feature_inputs.append(ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), size))
         size = self._env_params['screen_size']
         feature_inputs.append(ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), size))

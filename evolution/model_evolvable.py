@@ -17,7 +17,8 @@ class ModelEvolvable(BaseModel):
         self.data_format = None
 
         self.weight_placeholders = []
-        self.assign_op = None
+        self.bias_placeholders = []
+        self.initialize_op = None
         self.add_op = None
         self.reset_bias_op = None
 
@@ -113,7 +114,7 @@ class ModelEvolvable(BaseModel):
         policy = (fn_out, args_out)
         self.create_assign_operations()
 
-        return block_inputs, policy, value, self.weight_placeholders, available_actions_input
+        return block_inputs, policy, value, self.weight_placeholders, self.bias_placeholders, available_actions_input
 
     def function_id_output(self, x, channels):
         logits = self.dense(x, 'func_id', size=channels, bias=True)
@@ -136,27 +137,30 @@ class ModelEvolvable(BaseModel):
             logits = layers.flatten(logits)
         return tf.math.argmax(logits, axis=1)
 
-    def assign_tensors(self):
-        return self.assign_op
+    def initialize_tensors(self):
+        return self.initialize_op
 
-    def assign_add_tensors(self):
+    def add_tensors(self):
         return self.add_op
 
     def create_assign_operations(self):
-        assign_ops = []
+        assign_weight_ops = []
         add_ops = []
-        for variable in self.weights:
-            placeholder = tf.placeholder(dtype=tf.float32, shape=variable.shape)
-            self.weight_placeholders.append(placeholder)
-            assign_ops.append(variable.assign(placeholder))
-            add_ops.append(variable.assign_add(placeholder))
-        self.assign_op = tf.group(*assign_ops)
-        self.add_op = tf.group(*add_ops)
-
         reset_bias_ops = []
-        for variable in self.biases:
-            reset_bias_ops.append(variable.assign(tf.zeros(variable.shape, dtype=tf.float32)))
-        self.reset_bias_op = tf.group(*reset_bias_ops)
+        for weight in self.weights:
+            placeholder = tf.placeholder(dtype=tf.float32, shape=weight.shape)
+            self.weight_placeholders.append(placeholder)
+
+
+            assign_weight_ops.append(weight.assign(placeholder))
+            add_ops.append(weight.assign_add(placeholder))
+        for bias in self.biases:
+            placeholder = tf.placeholder(dtype=tf.float32, shape=bias.shape)
+            self.bias_placeholders.append(placeholder)
+            add_ops.append(bias.assign_add(placeholder))
+            reset_bias_ops.append(bias.assign(tf.zeros(bias.shape, dtype=tf.float32)))
+        self.initialize_op = tf.group(*assign_weight_ops, *reset_bias_ops)
+        self.add_op = tf.group(*add_ops)
 
     def compress(self):
         return CompressedModel(self.start_seed, self.evolve_seeds)
