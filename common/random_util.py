@@ -24,8 +24,11 @@ class RandomUtil:
         return np.random.choice(cls._random_table, shape)
 
     @classmethod
-    def xavier_initializer(cls, shape, num_in, num_out):
-        return np.random.normal(0, 1, shape) * np.sqrt(2/num_in)
+    def xavier_initializer(cls, shape):
+        out = np.random.randn(np.prod(shape[:-1]), shape[-1]).astype(np.float32)
+        out *= 1.0 / np.sqrt(np.square(out).sum(axis=0, keepdims=True))     # normalization
+        out = np.reshape(out, shape)
+        return out
 
     @classmethod
     def get_random_seed(cls):

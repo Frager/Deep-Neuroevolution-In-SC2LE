@@ -42,8 +42,8 @@ class TestAgent:
         feed_dict = {}
         # xavier initialize weights
         Random.set_seed(start_seed)
-        for placeholder, n_in_out in zip(self.weight_placeholders, self.model.weights_in_out):
-            feed_dict[placeholder] = Random.xavier_initializer(placeholder.shape, n_in_out[0], n_in_out[1])
+        for placeholder in self.weight_placeholders:
+            feed_dict[placeholder] = Random.xavier_initializer(placeholder.shape)
         self.session.run(self.model.initialize_tensors(), feed_dict=feed_dict)
 
     def model_evolve(self, evolve_seed):
@@ -72,6 +72,11 @@ class TestAgent:
             [self.policy[0], self.policy[1], self.value],
             feed_dict=feed_dict
         )
+        # # To get parameter count
+        # num_vars = 0
+        # for variable in self.bias_placeholders + self.weight_placeholders:
+        #     num_vars += np.prod(variable.get_shape().as_list())
+        # print(num_vars)
         if available_actions[0][action_id[0]] == 0:
             action_id[0] = 0   # no_op
         return [action_id, action_args], value_estimate

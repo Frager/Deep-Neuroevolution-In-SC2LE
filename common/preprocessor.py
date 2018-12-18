@@ -18,7 +18,13 @@ class Preprocessor:
         for o in obs:
             # if feature_input is spacial is not handled
             for feat_name in feat_names:
-                processed_observations.append(o[feat_name])
+                if feat_name == "last_actions":
+                    if len(o[feat_name]) == 1:
+                        processed_observations.append(o[feat_name])
+                    else:
+                        processed_observations.append([0])
+                else:
+                    processed_observations.append(o[feat_name])
         return np.concatenate(processed_observations)
 
     def preprocess_available_actions(self, available_actions_raw):

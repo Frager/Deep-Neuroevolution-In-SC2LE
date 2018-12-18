@@ -17,7 +17,7 @@ flat_feature_spec = dict({
         "cargo_slots_available": (1,),
         "control_groups": (10, 2),
         "game_loop": (1,),
-        # "last_actions": (0,),
+        "last_actions": (1,),
         # "multi_select": (0, len(getattr(features, "UnitLayer"))),  # pytype: disable=wrong-arg-types
         "player": (len(getattr(features, "Player")),),  # pytype: disable=wrong-arg-types
         "score_cumulative": (len(getattr(features, "ScoreCumulative")),),  # pytype: disable=wrong-arg-types
