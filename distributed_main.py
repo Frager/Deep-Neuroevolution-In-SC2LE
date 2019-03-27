@@ -1,14 +1,13 @@
 import sys
-import os
 from absl import flags
 from common.file_writer import *
 from evolution.ga import GA
 from pysc2.env import sc2_env
-from evolution.celery_app import app
+from celery_app import app
 import time
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("screen_size", "24", "Resolution for screen feature layers.")
+flags.DEFINE_integer("screen_size", "16", "Resolution for screen feature layers.")
 flags.DEFINE_integer("rgb_screen_size", None, "Resolution for rendered screen.")
 flags.DEFINE_enum("action_space", None, sc2_env.ActionSpace._member_names_,  # pylint: disable=protected-access
                   "Which action space to use. Needed if you take both feature "
@@ -29,30 +28,27 @@ flags.DEFINE_enum("agent2_race", "random", sc2_env.Race._member_names_,  # pylin
                   "Agent 2's race.")
 flags.DEFINE_enum("difficulty", "very_easy", sc2_env.Difficulty._member_names_,  # pylint: disable=protected-access
                   "If agent2 is a built-in Bot, it's strength.")
-flags.DEFINE_string("map", "MoveToBeacon", "Name of a map to use.")
+flags.DEFINE_string("map", "CollectMineralShards", "Name of a map to use.")
 
-
-flags.DEFINE_float("random_table_sigma", 0.005, "Sigma for random table.")
+flags.DEFINE_float("random_table_sigma", 0.015, "Sigma for random table.")
 flags.DEFINE_integer("random_table_seed", 1234, "Random table initialisation seed")
 flags.DEFINE_integer("random_table_size", 10000, "Random table size")
-
 
 flags.DEFINE_bool("save", True, "save models?")
 flags.DEFINE_string("save_to", "unnamed_experiment", "relative file path when saving models")
 flags.DEFINE_string("load_from", "", "relative file path for loading models")
-flags.DEFINE_integer("gen", "0", "from generation (0 equals last generation)")
+flags.DEFINE_integer("gen", "0", "generation to load from")
 flags.DEFINE_integer("save_interval", 1, "save generations in intervals")
-
 flags.DEFINE_integer("max_generations", 0, "number of generations until the algorithm stops")
 
-flags.DEFINE_integer("population", 50, "population per generation")
-flags.DEFINE_integer("truncation", 5, "truncation ")
+flags.DEFINE_integer("population", 1000, "population per generation")
+flags.DEFINE_integer("truncation", 40, "truncation ")
 flags.DEFINE_integer("elites", 1, "number of best models to keep unchanged in next generation")
-flags.DEFINE_integer("elite_evaluations", 2, "how often truncated models are evaluated to get elite")
+flags.DEFINE_integer("elite_evaluations", 30, "how often truncated models are evaluated to get elite")
 flags.DEFINE_string("flat_feature_names", "player", "string of flat feature names, separated by ','")
 flags.DEFINE_bool("use_minimap", False, "Whether model uses minimap or not.")
-# TODO: truncation, population, elites
-# Not necessary when using app.run()
+flags.DEFINE_bool("use_biases", True, "Whether network uses biases or not.")
+
 FLAGS(sys.argv)
 
 
@@ -70,12 +66,17 @@ def main():
     work_dir = os.path.join(work_dir, 'experiments')
 
     if load_from != '':
+        # load models and parameters from saved experiment
+        generation = FLAGS.gen
         load_path = os.path.join(work_dir, load_from)
         models_load_path = os.path.join(load_path, 'models')
-        models = load_models(models_load_path, FLAGS.gen)
+        models = load_models(models_load_path, generation)
         parameters = load_dict(load_path, 'worker_parameters.json')
+        if 'use_biases' not in parameters:
+            parameters['use_biases'] = True     # for compatibility with experiments from older versions
         ga_parameters = load_dict(load_path, 'ga_parameters.json')
     else:
+        generation = 0
         parameters, ga_parameters = parameters_from_flags()
         models = None
 
@@ -86,8 +87,8 @@ def main():
 
     ga = GA(population=ga_parameters['population'], compressed_models=models, env_params=parameters)
 
-    generation = 0
     while max_generations == 0 or generation < max_generations:
+        # Perform one generational loop, log stats and save models
         generation += 1
         start = time.time()
         scored_models, truncated_stats, all_stats = ga.evolve_iteration(elites=ga_parameters['elites'],
@@ -124,6 +125,7 @@ def parameters_from_flags():
     parameters['random_table_sigma'] = FLAGS.random_table_sigma
     parameters['random_table_seed'] = FLAGS.random_table_seed
     parameters['random_table_size'] = FLAGS.random_table_size
+    parameters['use_biases'] = FLAGS.use_biases
 
     ga_parameters = dict()
     ga_parameters['population'] = FLAGS.population

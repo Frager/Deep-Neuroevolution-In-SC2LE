@@ -2,24 +2,28 @@ import tensorflow as tf
 
 
 class BaseModel:
+    # Base class containing for creating the different neural network layers
+    # keeps track of all created weight and bias variables
+
     def __init__(self, scope):
-        self.weights_in_out = []
         self.weights = []
         self.biases = []
         self.scope = scope
 
     def create_weight(self, shape, layer_in, layer_out):
+        # called when creating weights for layers to keep track of variables
         w = tf.get_variable('w', dtype=tf.float32, shape=shape, trainable=False)
         self.weights.append(w)
-        self.weights_in_out.append((layer_in, layer_out))
         return w
 
     def create_bias(self, shape):
+        # called when creating biases for layers to keep track of variables
         b = tf.get_variable('b', dtype=tf.float32, shape=shape, trainable=False)
         self.biases.append(b)
         return b
 
     def conv(self, x, name, kernel_size, num_outputs, stride=1, padding="SAME", bias=True):
+        # creates a convolutional layer
         assert len(x.get_shape()) == 4  # Batch x Height x Width x Channel
         with tf.variable_scope(name):
             w = self.create_weight(shape=(1, kernel_size, kernel_size, int(x.get_shape()[-1].value), num_outputs),
@@ -44,6 +48,7 @@ class BaseModel:
                 return ret
 
     def dense(self, x, name, size, bias=True):
+        # creates a dense (fully connected) layer
         with tf.variable_scope(name):
             w = self.create_weight(shape=(x.get_shape()[-1].value, size), layer_in=x.get_shape()[-1].value, layer_out=size)
             ret = tf.matmul(x, w)

@@ -1,7 +1,6 @@
 from absl import flags
 from celery import Task
 import tensorflow as tf
-import common.env as environment
 from pysc2.env import sc2_env
 import importlib
 from evolution.model_input import ModelInput
@@ -15,6 +14,13 @@ from common.random_util import RandomUtil
 
 
 class WorkerEnvironment(Task):
+    # Base class for managing the RL-Environments.
+    # (Only) env_params(params) needs to be called before it can be used.
+    # When env_params(params) is called to pass environment parameters, (re-)initializes
+    #   - SC2 environment
+    #   - agent (and neural network model)
+    # or reuses them when already initialized and params are the same.
+
     _agent = None
     _env = None
     _sess = None
@@ -23,13 +29,12 @@ class WorkerEnvironment(Task):
 
     def __init__(self):
         tf.reset_default_graph()
-        # sc2le needs flags parsed
-        flags.FLAGS(['main.py'])
+        # PySC2 needs flags parsed or it will cause exceptions
+        flags.FLAGS(['distributed_main.py'])
 
     @property
     def sess(self):
         if self._sess is None:
-            # TODO: is this correct? Do I need to worry about closing the session?
             self._sess = tf.Session()
         return self._sess
 
@@ -69,13 +74,18 @@ class WorkerEnvironment(Task):
 
     @env_params.setter
     def env_params(self, params):
+        # Setter for environment parameters.
+        # Will set up environment and agent according to parameters in params
+
         params_changed = False
+        # Check if parameters changed
         for key, value in params.items():
             if key in self._env_params.keys():
                 if self._env_params[key] == value:
                     continue
             self._env_params[key] = value
             params_changed = True
+        # If changed: re-initializes random table, environment and agent
         if params_changed:
             RandomUtil.reinitialize_random_table(size=params['random_table_size'],
                                                  sigma=params['random_table_sigma'],
@@ -87,9 +97,18 @@ class WorkerEnvironment(Task):
     def shut_down_env(self):
         if self._env is not None:
             self._env.close()
+        if self._sess is not None:
+            self._sess.close()
+            self._sess = None
         tf.reset_default_graph()
 
     def setup_agent(self):
+        # Sets up Agent (incl. model configuration for Input/outputs)
+        # Returns Agent class
+
+        if self._sess is not None:
+            self._sess.close()
+            self._sess = None
         tf.reset_default_graph()
         agent_module, agent_name = self._env_params['agent'].rsplit(".", 1)
         agent_cls = getattr(importlib.import_module(agent_module), agent_name)
@@ -97,24 +116,31 @@ class WorkerEnvironment(Task):
         return self._agent
 
     def setup_environment(self):
+        # Set up wrapped SC2 environment.
+        # Returns EnvWrapper class.
+
         if self._env is not None:
             self._env.close()
         players = list()
         players.append(sc2_env.Agent(sc2_env.Race[self._env_params['agent_race']]))
-        sc2_environment = environment.make_env(map_name=self._env_params['map_name'],
-                                               players=players,
-                                               step_mul=self._env_params['step_mul'],
-                                               agent_interface_format=sc2_env.parse_agent_interface_format(
-                                                   feature_screen=self._env_params['screen_size'],
-                                                   feature_minimap=self._env_params['screen_size'],
-                                                   rgb_screen=self._env_params['rgb_screen_size'],
-                                                   rgb_minimap=self._env_params['rgb_screen_size'],
-                                                   action_space=self._env_params['action_space'],
-                                                   use_feature_units=self._env_params['use_feature_units']))
+        sc2_environment = sc2_env.SC2Env(map_name=self._env_params['map_name'],
+                                         players=players,
+                                         step_mul=self._env_params['step_mul'],
+                                         agent_interface_format=sc2_env.parse_agent_interface_format(
+                                             feature_screen=self._env_params['screen_size'],
+                                             feature_minimap=self._env_params['screen_size'],
+                                             rgb_screen=self._env_params['rgb_screen_size'],
+                                             rgb_minimap=self._env_params['rgb_screen_size'],
+                                             action_space=self._env_params['action_space'],
+                                             use_feature_units=self._env_params['use_feature_units']))
         self._env = EnvWrapper(sc2_environment, self.model_config)
         return self._env
 
     def setup_model_config(self):
+        # creates ModelConfig (used to set up neural network inputs/outputs and ) according to data in environment
+        # parameters
+        # Returns ModelConfig class
+
         feature_inputs = list()
         flat_feature_names = self._env_params['features_flat']
         flat_feature_names = flat_feature_names.split(',')
@@ -132,5 +158,5 @@ class WorkerEnvironment(Task):
 
         scope = "test"
 
-        self._model_config = ModelConfig(feature_inputs, arg_outputs, size, NUM_FUNCTIONS, DataFormat.NHWC, scope)
+        self._model_config = ModelConfig(feature_inputs, arg_outputs, size, NUM_FUNCTIONS, DataFormat.NHWC, scope, self._env_params['use_biases'])
         return self._model_config

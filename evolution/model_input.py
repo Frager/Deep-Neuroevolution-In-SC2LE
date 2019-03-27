@@ -1,5 +1,7 @@
 
 class ModelInput:
+    # Class that defines model input structure
+
     def __init__(self, input_name, feature_names_list, channel_dims, spacial_dims=None):
         self.input_name = input_name
         self.feature_names_list = feature_names_list
@@ -19,16 +21,6 @@ class ModelInput:
 
     def get_spacial_dimensions(self):
         return self.spacial_dims
-
-    # TODO: is this useful?
-    def set_block_input(self, block_input):
-        self.block_input = block_input
-
-    # TODO: is this useful?
-    def get_block_input(self):
-        if self.block_input is None:
-            print("no block_input set")
-        return self.block_input
 
     def get_feature_names_as_scope(self):
         scope = ''

@@ -1,9 +1,12 @@
 import numpy as np
-from pysc2.lib.actions import FUNCTIONS, FUNCTION_TYPES, TYPES, FunctionCall
+from pysc2.lib.actions import FUNCTIONS, FUNCTION_TYPES, FunctionCall
 from common.feature_dimensions import is_spacial_action as is_spacial
 
 
 class Preprocessor:
+    # pre-processes data coming from SC2Env to the agents model and vice versa
+    # used by EnvWrapper class
+
     def __init__(self, model_config):
         self.model_config = model_config
 
@@ -33,13 +36,16 @@ class Preprocessor:
         return available_actions
 
     def preprocess_action(self, actions):
+        # converts model output to FunctionCall for SC2Env
+
         action_ids, args = actions[0], actions[1]
-        calls = []
-        for env_index, ids in enumerate(action_ids):
-            calls.append(self.to_sc2_action(ids, args))
-        return calls
+        function_calls = []
+        for ids in action_ids:
+            function_calls.append(self.to_sc2_action(ids, args))
+        return function_calls
 
     def to_sc2_action(self, action_id, action_args):
+        # creates FunctionCall
         chosen_function = FUNCTIONS[action_id]
         f_type = chosen_function.function_type
         function_args = FUNCTION_TYPES[f_type]

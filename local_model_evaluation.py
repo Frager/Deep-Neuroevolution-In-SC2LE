@@ -1,5 +1,3 @@
-import sys
-import common.env as env
 from absl import flags
 from pysc2.env import sc2_env
 from pysc2.lib import point_flag
@@ -12,10 +10,10 @@ from evolution.model_config import ModelConfig
 from common.env_wrapper import EnvWrapper
 from common.feature_dimensions import NUM_FUNCTIONS
 from common.file_writer import *
-from evolution.tasks import run_loop
+from evolution.model_evaluator import run_loop
 from common.random_util import RandomUtil
-
 import importlib
+
 
 if __name__ == '__main__':
     FLAGS = flags.FLAGS
@@ -62,16 +60,13 @@ if __name__ == '__main__':
     flags.DEFINE_integer("gen", "0", "from generation")
     flags.DEFINE_integer("top", "1", "model placement. Starting from the best = 1")
 
-    # Not necessary when using app.run()
     FLAGS(sys.argv)
     tf.reset_default_graph()
 
-    # setup workers
     agent_classes = []
     players = []
 
     agent_module, agent_name = FLAGS.agent.rsplit(".", 1)
-    # agent_cls = evolution.agent
     agent_cls = getattr(importlib.import_module(agent_module), agent_name)
     agent_classes.append(agent_cls)
 
@@ -80,21 +75,25 @@ if __name__ == '__main__':
     load_from = FLAGS.load_from
 
     load_path = os.path.join(work_dir, load_from)
-    models_load_path = os.path.join(load_path, 'models')
-    models = load_models(models_load_path, FLAGS.gen)
+    model_load_path = os.path.join(load_path, 'models')
+    model_load_path = os.path.join(model_load_path, 'gen_{}'.format(FLAGS.gen))
+    model = load_model(model_load_path, "model_top_{}.json".format(FLAGS.top))
+    print("model {} loaded".format("model_top_{}.json".format(FLAGS.top)))
     parameters = load_dict(load_path, 'worker_parameters.json')
     ga_parameters = load_dict(load_path, 'ga_parameters.json')
 
     players.append(sc2_env.Agent(sc2_env.Race[parameters['agent_race']]))
 
+    if 'use_biases' not in parameters:
+        parameters['use_biases'] = True     # for compatibility with experiments from older versions
+
     feature_inputs = list()
     flat_feature_names = parameters['features_flat']
     flat_feature_names = flat_feature_names.split(',')
     feature_inputs.append(ModelInput('flat', flat_feature_names, feature_dims.get_flat_feature_dims(flat_feature_names)))
-    if parameters['use_minimap']:
-        spacial_size = parameters['screen_size']
-        feature_inputs.append(ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), spacial_size))
     spacial_size = parameters['screen_size']
+    if parameters['use_minimap']:
+        feature_inputs.append(ModelInput('minimap', ['feature_minimap'], feature_dims.get_minimap_dims(), spacial_size))
     feature_inputs.append(ModelInput('screen', ['feature_screen'], feature_dims.get_screen_dims(), spacial_size))
 
     arg_outputs = []
@@ -105,19 +104,18 @@ if __name__ == '__main__':
     RandomUtil.reinitialize_random_table(size=parameters['random_table_size'],
                                          sigma=parameters['random_table_sigma'],
                                          seed=parameters['random_table_seed'])
-    model_config = ModelConfig(feature_inputs, arg_outputs, spacial_size, NUM_FUNCTIONS, DataFormat.NHWC, scope)
+    model_config = ModelConfig(feature_inputs, arg_outputs, spacial_size, NUM_FUNCTIONS, DataFormat.NHWC, scope, parameters['use_biases'])
 
-    # TODO: this code block probably goes in Worker class
-    sc2_env = env.make_env(map_name=parameters['map_name'],
-                           players=players,
-                           agent_interface_format=sc2_env.parse_agent_interface_format(
-                               feature_screen=parameters['screen_size'],
-                               feature_minimap=parameters['screen_size'],
-                               rgb_screen=parameters['rgb_screen_size'],
-                               rgb_minimap=parameters['rgb_screen_size'],
-                               action_space=parameters['action_space'],
-                               use_feature_units=parameters['use_feature_units']))
+    sc2_env = sc2_env.SC2Env(map_name=parameters['map_name'],
+                             players=players,
+                             agent_interface_format=sc2_env.parse_agent_interface_format(
+                             feature_screen=parameters['screen_size'],
+                             feature_minimap=parameters['screen_size'],
+                             rgb_screen=parameters['rgb_screen_size'],
+                             rgb_minimap=parameters['rgb_screen_size'],
+                             action_space=parameters['action_space'],
+                             use_feature_units=parameters['use_feature_units']))
     env = EnvWrapper(sc2_env, model_config)
     with tf.Session() as sess:
         agent = agent_cls(sess, model_config, tf.global_variables_initializer)
-        run_loop(models[FLAGS.top - 1], agent, env, max_frames=0, max_episodes=0, max_no_ops=0)
+        run_loop(model, agent, env, max_frames=0, max_episodes=0, max_no_ops=0, debug=True)

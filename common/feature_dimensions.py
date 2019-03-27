@@ -1,13 +1,15 @@
 from pysc2.lib import actions
 from pysc2.lib import features
 
+# makes information about different feature dimension more accessible
+
 NUM_FUNCTIONS = len(actions.FUNCTIONS)
 ACTION_TYPES = actions.TYPES
 
 
 CAT = features.FeatureType.CATEGORICAL
 
-# TODO: what do do with observations of unknown length?
+
 flat_feature_spec = dict({
         # "action_result": (0,),  # See error.proto: ActionResult.
         # "alerts": (0,),  # See sc2api.proto: Alert.
@@ -32,12 +34,13 @@ for name, arg_type in ACTION_TYPES._asdict().items():
     is_spacial_action[arg_type] = name in ['minimap', 'screen', 'screen2']
 
 
-# channel dimensions. Categorical feature types one-hot encoded
 def get_screen_dims():
+    # get channel dimensions with categorical feature types one-hot encoded
     return [feat.scale ** (feat.type == CAT) for feat in features.SCREEN_FEATURES]
 
 
 def get_minimap_dims():
+    # get channel dimensions with categorical feature types one-hot encoded
     return [feat.scale ** (feat.type == CAT) for feat in features.MINIMAP_FEATURES]
 
 
