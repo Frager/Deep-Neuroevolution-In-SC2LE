@@ -4,6 +4,8 @@ Both manager and workers need to run for the Genetic Algorithm to work.
 They don't have to be on the same machine, but they will need to be able to connect to the same  
 broker/backend specified in celery_app.py  
 
+It can be useful to run `python purge_tasks.py` to clean up the broker from leftover tasks after finishing an experiment and/or before running a new experiment
+
 It is recommended to use Docker when running everything on one machine:  
 	Crate custom network `$ docker network create network_name`  
 	Create persistent volume `$ docker volume create deep_ne_volume`  
@@ -38,4 +40,6 @@ To continue an experiment (saved within experiments folder) run distributed_main
 Example:  
 `$ python distributed_main.py --load_from experiment_name --save_to experiment_name --gen 50`  
 
-It can be useful to run `python purge_tasks.py` to clean up the broker from leftover tasks after finishing an experiment and/or before running a new experiment
+## Manual model evaluation  
+Example for running the best model from generation 30:  
+`$ python local_model_evaluation.py --load_from experiment_name --top 1 --gen 30`  
