@@ -24,3 +24,5 @@ To continue an experiment (saved within experiments folder) run distributed_main
 --gen generation_number_to_continue
 Example: 
 "python distributed_main.py --load_from experiment_name --save_to experiment_name --gen 50"
+
+It can be usefull to run "python purge_tasks.py" to clean up the broker from leftover tasks after finishing an experiment
