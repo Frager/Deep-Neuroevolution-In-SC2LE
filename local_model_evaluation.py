@@ -38,7 +38,7 @@ if __name__ == '__main__':
     flags.DEFINE_integer("max_episodes", 0, "Total episodes.")
     flags.DEFINE_integer("step_mul", 8, "Game steps per agent step.")
 
-    flags.DEFINE_string("agent", "evolution.agent.TestAgent",
+    flags.DEFINE_string("agent", "evolution.agent.NeuroevolutionAgent",
                         "Which agent to run, as a python path to an Agent class.")
     flags.DEFINE_enum("agent_race", "random", sc2_env.Race._member_names_,  # pylint: disable=protected-access
                       "Agent 1's race.")

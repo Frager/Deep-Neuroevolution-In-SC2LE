@@ -3,8 +3,7 @@ import numpy as np
 from evolution.model_evolvable import ModelEvolvable as Model
 
 
-#TODO:Rename
-class TestAgent:
+class NeuroevolutionAgent:
     # The agent acting in SC2LE.
     # Uses a neural network model to decide on actions when calling step()
     # setup_model() needs to be called to initialize the model first
@@ -58,7 +57,6 @@ class TestAgent:
         for placeholder in self.bias_placeholders:
             feed_dict[placeholder] = Random.get_random_values(placeholder.shape)
         self.session.run(self.model.add_tensors(), feed_dict=feed_dict)
-        # TODO: what about biases?
 
     def compress_model(self):
         # returns CompressedModel class containing start seed and evolve seeds
@@ -106,7 +104,6 @@ class TestAgent:
 
         feed_dict = {}
         for input_name, value in obs.items():
-            # TODO: [value] is only a temporary solution for batched observations (which I don't think I need)
             feed_dict[self.block_inputs[input_name]] = [value]
         return feed_dict
 
