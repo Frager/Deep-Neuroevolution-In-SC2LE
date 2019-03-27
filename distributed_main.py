@@ -18,7 +18,7 @@ flags.DEFINE_bool("disable_fog", False, "Whether to disable Fog of War.")
 flags.DEFINE_integer("max_agent_steps", 0, "Total agent steps.")
 flags.DEFINE_integer("game_steps_per_episode", None, "Game steps per episode.")
 flags.DEFINE_integer("max_episodes", 1, "Total episodes.")
-flags.DEFINE_integer("step_mul", 16, "Game steps per agent step.")
+flags.DEFINE_integer("step_mul", 32, "Game steps per agent step.")
 flags.DEFINE_string("agent", "evolution.agent.TestAgent",
                     "Which agent to run, as a python path to an Agent class.")
 flags.DEFINE_enum("agent_race", "random", sc2_env.Race._member_names_,  # pylint: disable=protected-access
