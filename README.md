@@ -14,20 +14,20 @@ It is recommended to use Docker when running everything on one machine:
 	To connect to running container: `$ docker exec -i -t deep_ne_container /bin/bash`  
 	Run manager and worker commands (listed below) in background. E.g.: `$ nohup python distributed_main.py &> nohup_manager.out&`  
 
-##Manager  
+## Manager  
 To run the manager (main GA code) in default configuration run `python distributed_main.py`  
 If you want to change the default configurations, run with flags (see distributed_main.py)  
 example:  
 `$ python distributed_main.py --map FindAndDefeatRoaches --use_minimap`  
 
-##Worker  
+## Worker  
 To run the workers (for model evaluations) run:  
 `$ celery -A evolution.tasks worker --loglevel=info --concurrency=4 -Ofair`  
 	concurrency defines the number of workers. Start with 1/4 of CPU cores and increase if performance allows it  
 	if not set: concurrency default is equal to CPU cores  
 
 
-##Saving and loading experiments  
+## Saving and loading experiments  
 Set --save_to 'experiment_name' when running distributed_main.py to specify save location (within experiments folder)  
 By default, save_to flag is "unnamed_experiment"  
 
