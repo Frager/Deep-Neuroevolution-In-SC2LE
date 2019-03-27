@@ -66,11 +66,9 @@ def load_models(load_path, generation):
         sys.exit("Trying to load generation ({}) from {} that dose not exist".format(generation, load_path))
     print("loading models from :"+load_path)
     model_files = [f for f in os.listdir(load_path) if os.path.isfile(os.path.join(load_path, f))]
-    print(model_files)
     models = []
     for i in range(len(model_files)):
         models.append(load_model(load_path, "model_top_{}.json".format(i+1)))
-        print("model_top_{}.json".format(i+1))
     # for model in model_files:
     #     models.append(load_model(load_path, model))
     return models
