@@ -1,5 +1,31 @@
 # Deep-Neuroevolution-In-SC2LE
 
+This code was written as part of a master thesis.
+
+Deep Neuroevolution concerns evolving deep neural networks using evolutionary algorithms.
+The code contains a simple genetic algorithm (GA), that evolves a population of neural network models over the cource of generations.  
+Each generation the worst models get truncated, while the best get to mutate, filling up the next generations population.
+The neural network models have millions of parameters, so it would be infeasable to store those parameters as a parametervector.
+For that reason a compresion method that was introduced by Uber Engineering (see paper below) was used to store these parameters in just hundreds of bytes. Each model is encoded as an array of seeds. To decompress the model these seeds are used to seed a pseudo random number generator, which then outputs the model parameters.
+
+Uber Engineering's paper describing the GA and seed based compression method:  
+https://arxiv.org/abs/1712.06567
+
+SC2LE:
+https://github.com/deepmind/pysc2  
+Deep-Neuroevolution:
+https://eng.uber.com/deep-neuroevolution/
+
+## Results
+
+Video of some of the agents's performances evolved using this code:  
+https://www.youtube.com/watch?v=Bn1KmSrB7gY&t=43s  
+
+
+![alt text](images/Results.png "Description goes here")
+
+
+# Start Guide
 Both manager and workers need to run for the Genetic Algorithm to work.  
 They don't have to be on the same machine, but they will need to be able to connect to the same  
 broker/backend specified in celery_app.py  
