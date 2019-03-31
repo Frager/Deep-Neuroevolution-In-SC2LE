@@ -19,7 +19,7 @@ https://eng.uber.com/deep-neuroevolution/
 ## Results
 
 Video of some of the agents's performances evolved using this code:  
-https://www.youtube.com/watch?v=Bn1KmSrB7gY&t=43s  
+https://www.youtube.com/watch?v=Bn1KmSrB7gY&t=
 
 
 ![alt text](images/Results.png "Description goes here")
